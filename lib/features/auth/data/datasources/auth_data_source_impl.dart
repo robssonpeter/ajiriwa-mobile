@@ -160,9 +160,13 @@ class AuthDataSourceImpl implements AuthDataSource {
         return null;
       }
 
+      // Check for stored candidate ID
+      final storedCandidateIdStr = await apiClient.secureStorage.read(key: ApiClient.candidateIdKey);
+      final int? storedCandidateId = storedCandidateIdStr != null ? int.tryParse(storedCandidateIdStr) : null;
+
       try {
         // Try to get current user from server
-        return await getCurrentUser();
+        return await getCurrentUser(candidateId: storedCandidateId);
       } catch (e) {
         // If server request fails, try to get user from local storage
         final userDataString = await apiClient.secureStorage.read(key: userDataKey);
@@ -193,12 +197,41 @@ class AuthDataSourceImpl implements AuthDataSource {
   }
 
   @override
-  Future<UserModel?> getCurrentUser() async {
+  Future<UserModel?> getCurrentUser({int? candidateId}) async {
     try {
-      final response = await apiClient.get('/profile');
+      final path = candidateId != null ? '/profile?candidate_id=$candidateId' : '/profile';
+      final response = await apiClient.get(path);
+      
+      // Save user data for offline access
+      await apiClient.secureStorage.write(
+        key: userDataKey,
+        value: json.encode(response),
+      );
+      
+      if (candidateId != null) {
+        await apiClient.secureStorage.write(
+          key: ApiClient.candidateIdKey,
+          value: candidateId.toString(),
+        );
+      }
+
       return UserModel.fromJson(response);
     } catch (e) {
       return null;
+    }
+  }
+
+  @override
+  Future<UserModel> switchProfile(int candidateId) async {
+    try {
+      final user = await getCurrentUser(candidateId: candidateId);
+      if (user == null) {
+        throw ServerException('Failed to switch profile');
+      }
+      return user;
+    } catch (e) {
+      if (e is ServerException) throw e;
+      throw ServerException('An error occurred while switching profile');
     }
   }
 

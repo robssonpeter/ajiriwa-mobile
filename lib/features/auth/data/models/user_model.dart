@@ -10,8 +10,10 @@ class UserModel extends User {
     String? role,
     String? photoUrl,
     String? headline,
-    required String token,
+    String? token,
     String? message,
+    List<Map<String, dynamic>>? candidates,
+    int? selectedCandidateId,
     Map<String, dynamic>? candidateDetails,
   }) : super(
           id: id,
@@ -20,23 +22,33 @@ class UserModel extends User {
           role: role,
           photoUrl: photoUrl,
           headline: headline,
-          token: token,
+          token: token ?? '',
           message: message,
+          candidates: candidates,
+          selectedCandidateId: selectedCandidateId,
           candidateDetails: candidateDetails,
         );
 
   /// Create a model from JSON
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final userData = json['user'] != null ? json['user'] as Map<String, dynamic> : json;
+    
     return UserModel(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
-      role: json['role'],
-      photoUrl: json['profile_photo_url'],
-      headline: json['professional_title'] ?? json['headline'],
+      id: userData['id'],
+      name: userData['name'],
+      email: userData['email'],
+      role: userData['role'],
+      photoUrl: userData['profile_photo_url'],
+      headline: userData['professional_title'] ?? userData['headline'],
       token: json['token'] ?? '',
       message: json['message'],
-      candidateDetails: json['candidate'] != null ? Map<String, dynamic>.from(json['candidate']) : null,
+      candidates: json['candidateOptions'] != null 
+          ? List<Map<String, dynamic>>.from(json['candidateOptions']) 
+          : null,
+      selectedCandidateId: json['selectedCandidateId'],
+      candidateDetails: json['profile'] != null 
+          ? Map<String, dynamic>.from(json['profile']) 
+          : (userData['candidate'] != null ? Map<String, dynamic>.from(userData['candidate']) : null),
     );
   }
 
@@ -51,7 +63,9 @@ class UserModel extends User {
       'headline': headline,
       'token': token,
       'message': message,
-      'candidate': candidateDetails,
+      'candidateOptions': candidates,
+      'selectedCandidateId': selectedCandidateId,
+      'profile': candidateDetails,
     };
   }
 }

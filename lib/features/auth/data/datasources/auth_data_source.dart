@@ -28,7 +28,10 @@ abstract class AuthDataSource {
   Future<UserModel?> checkAuth();
 
   /// Get the current user
-  Future<UserModel?> getCurrentUser();
+  Future<UserModel?> getCurrentUser({int? candidateId});
+
+  /// Switch to a different candidate profile
+  Future<UserModel> switchProfile(int candidateId);
 
   /// Request password reset for the given email
   Future<void> forgotPassword({

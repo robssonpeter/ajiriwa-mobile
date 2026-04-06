@@ -31,7 +31,10 @@ abstract class AuthRepository {
   Future<Either<Failure, User?>> checkAuth();
 
   /// Get the current user
-  Future<Either<Failure, User?>> getCurrentUser();
+  Future<Either<Failure, User?>> getCurrentUser({int? candidateId});
+
+  /// Switch to a different candidate profile
+  Future<Either<Failure, User>> switchProfile(int candidateId);
 
   /// Request password reset for the given email
   Future<Either<Failure, void>> forgotPassword({

@@ -38,6 +38,14 @@ class ProfileScreen extends StatelessWidget {
                   _buildProfileHeader(context, user),
                   const SizedBox(height: 24),
 
+                  // Multi-profile switcher
+                  if (user.candidates != null && user.candidates!.length > 1) ...[
+                    _buildSectionHeader(context, 'Switch Profile'),
+                    const SizedBox(height: 16),
+                    _buildProfileSwitcher(context, user),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Resume section
                   _buildSectionHeader(context, 'My Resume'),
                   const SizedBox(height: 16),
@@ -185,6 +193,54 @@ class ProfileScreen extends StatelessWidget {
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildProfileSwitcher(BuildContext context, User user) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: user.candidates!.length,
+        separatorBuilder: (context, index) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final candidate = user.candidates![index];
+          final isSelected = candidate['id'] == user.selectedCandidateId;
+          
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isSelected 
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  : Colors.grey.shade100,
+              child: Icon(
+                Icons.person,
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primary 
+                    : Colors.grey,
+              ),
+            ),
+            title: Text(
+              candidate['label'] ?? 'CV #${candidate['id']}',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Theme.of(context).colorScheme.primary : null,
+              ),
+            ),
+            subtitle: candidate['title'] != null ? Text(candidate['title']) : null,
+            trailing: isSelected 
+                ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+                : null,
+            onTap: isSelected ? null : () {
+              context.read<AuthBloc>().add(SwitchCandidateEvent(candidate['id']));
+            },
+          );
+        },
       ),
     );
   }

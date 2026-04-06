@@ -15,27 +15,30 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, authState) {
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, authState) {
         if (authState is Authenticated) {
-          final user = authState.user;
-
-          // Load dashboard data when authenticated
           context.read<DashboardBloc>().add(LoadDashboardEvent());
+        }
+      },
+      child: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, authState) {
+          if (authState is Authenticated) {
+            final user = authState.user;
 
-          return Scaffold(
-            backgroundColor: Colors.grey.shade50,
-            body: SafeArea(
-              child: BlocBuilder<DashboardBloc, DashboardState>(
-                builder: (context, state) {
-                  if (state is DashboardLoading) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  } else if (state is DashboardLoaded) {
-                    final dashboard = state.dashboard;
-                    return _buildDashboardContent(context, user.name, dashboard);
-                  } else if (state is DashboardError) {
+            return Scaffold(
+              backgroundColor: Colors.grey.shade50,
+              body: SafeArea(
+                child: BlocBuilder<DashboardBloc, DashboardState>(
+                  builder: (context, state) {
+                    if (state is DashboardLoading) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    } else if (state is DashboardLoaded) {
+                      final dashboard = state.dashboard;
+                      return _buildDashboardContent(context, user.name, dashboard, user);
+                    } else if (state is DashboardError) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -84,7 +87,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDashboardContent(BuildContext context, String userName, Dashboard dashboard) {
+  Widget _buildDashboardContent(BuildContext context, String userName, Dashboard dashboard, User user) {
     final firstName = userName.split(' ').first;
 
     return SingleChildScrollView(
@@ -92,6 +95,12 @@ class DashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Profile Switcher (Compact)
+          if (user.candidates != null && user.candidates!.length > 1) ...[
+            _buildProfileSwitcherCompact(context, user),
+            const SizedBox(height: 24),
+          ],
+
           // Greeting section
           Text(
             'Good Afternoon,',
@@ -160,6 +169,122 @@ class DashboardScreen extends StatelessWidget {
           _buildRecentApplicationsList(dashboard.recentApplications),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileSwitcherCompact(BuildContext context, User user) {
+    final selectedCandidate = user.candidates?.firstWhere(
+      (c) => c['id'] == user.selectedCandidateId,
+      orElse: () => user.candidates!.first,
+    );
+
+    return InkWell(
+      onTap: () {
+        _showProfileSelectionSheet(context, user);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: BorderSide(color: AppTheme.primaryColor.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.primaryColor,
+              child: const Icon(Icons.person, size: 18, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Active Profile',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    selectedCandidate?['label'] ?? 'Default CV',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.swap_horiz, color: AppTheme.primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showProfileSelectionSheet(BuildContext context, User user) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Switch Profile',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: user.candidates!.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final candidate = user.candidates![index];
+                      final isSelected = candidate['id'] == user.selectedCandidateId;
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected 
+                              ? AppTheme.primaryColor.withOpacity(0.1)
+                              : Colors.grey.shade100,
+                          child: Icon(
+                            Icons.person,
+                            color: isSelected ? AppTheme.primaryColor : Colors.grey,
+                          ),
+                        ),
+                        title: Text(
+                          candidate['label'] ?? 'CV #${candidate['id']}',
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: candidate['title'] != null ? Text(candidate['title']) : null,
+                        trailing: isSelected 
+                            ? const Icon(Icons.check_circle, color: AppTheme.primaryColor)
+                            : null,
+                        onTap: () {
+                          Navigator.pop(context);
+                          if (!isSelected) {
+                            context.read<AuthBloc>().add(SwitchCandidateEvent(candidate['id']));
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

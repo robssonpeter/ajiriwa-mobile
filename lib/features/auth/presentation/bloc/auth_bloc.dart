@@ -18,6 +18,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LoginWithAppleEvent>(_onLoginWithApple);
     on<LogoutEvent>(_onLogout);
     on<ForgotPasswordEvent>(_onForgotPassword);
+    on<SwitchCandidateEvent>(_onSwitchCandidate);
+  }
+
+  /// Handle switch candidate event
+  Future<void> _onSwitchCandidate(
+    SwitchCandidateEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is Authenticated) {
+      emit(AuthLoading());
+      final result = await authRepository.switchProfile(event.candidateId);
+      result.fold(
+        (failure) => emit(Authenticated(currentState.user)), // Revert to old user on failure
+        (user) => emit(Authenticated(user)),
+      );
+    }
   }
 
   /// Handle check auth status event

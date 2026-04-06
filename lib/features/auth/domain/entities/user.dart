@@ -26,7 +26,13 @@ class User extends Equatable {
   /// User message
   final String? message;
 
-  /// User candidate details
+  /// Available candidates for this user (multi-profile)
+  final List<Map<String, dynamic>>? candidates;
+
+  /// Currently selected candidate ID
+  final int? selectedCandidateId;
+
+  /// User candidate details (deprecated: use candidates and selectedCandidateId instead)
   final Map<String, dynamic>? candidateDetails;
 
   /// Constructor
@@ -39,9 +45,11 @@ class User extends Equatable {
     this.headline,
     required this.token,
     this.message,
+    this.candidates,
+    this.selectedCandidateId,
     this.candidateDetails,
   });
 
   @override
-  List<Object?> get props => [id, name, email, role, photoUrl, headline, token, message, candidateDetails];
+  List<Object?> get props => [id, name, email, role, photoUrl, headline, token, message, candidates, selectedCandidateId, candidateDetails];
 }

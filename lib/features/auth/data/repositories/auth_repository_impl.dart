@@ -135,10 +135,26 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, User?>> getCurrentUser() async {
+  Future<Either<Failure, User?>> getCurrentUser({int? candidateId}) async {
     if (await networkInfo.isConnected) {
       try {
-        final user = await remoteDataSource.getCurrentUser();
+        final user = await remoteDataSource.getCurrentUser(candidateId: candidateId);
+        return Right(user);
+      } on ServerException catch (e) {
+        return Left(ServerFailure(e.message));
+      } catch (e) {
+        return const Left(ServerFailure('An unexpected error occurred'));
+      }
+    } else {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, User>> switchProfile(int candidateId) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final user = await remoteDataSource.switchProfile(candidateId);
         return Right(user);
       } on ServerException catch (e) {
         return Left(ServerFailure(e.message));

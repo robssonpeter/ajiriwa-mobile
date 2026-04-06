@@ -20,6 +20,9 @@ class ApiClient {
   /// Token key for secure storage
   static const String tokenKey = 'auth_token';
 
+  /// Selected candidate ID key for secure storage
+  static const String candidateIdKey = 'selected_candidate_id';
+
   /// Constructor
   ApiClient({
     required this.dio,
@@ -31,14 +34,24 @@ class ApiClient {
       'Accept': 'application/json',
     };
 
-    // Add interceptor for authentication
+    // Add interceptor for authentication and multi-profile support
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Add auth token
           final token = await secureStorage.read(key: tokenKey);
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+
+          // Add selected candidate ID if not already present in query parameters
+          if (!options.queryParameters.containsKey('candidate_id')) {
+            final candidateId = await secureStorage.read(key: candidateIdKey);
+            if (candidateId != null) {
+              options.queryParameters['candidate_id'] = candidateId;
+            }
+          }
+
           return handler.next(options);
         },
         onError: (error, handler) {

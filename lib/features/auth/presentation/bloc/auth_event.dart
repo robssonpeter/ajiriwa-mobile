@@ -61,6 +61,18 @@ class LoginWithAppleEvent extends AuthEvent {}
 /// Logout event
 class LogoutEvent extends AuthEvent {}
 
+/// Switch candidate profile event
+class SwitchCandidateEvent extends AuthEvent {
+  /// Candidate ID
+  final int candidateId;
+
+  /// Constructor
+  const SwitchCandidateEvent(this.candidateId);
+
+  @override
+  List<Object?> get props => [candidateId];
+}
+
 /// Forgot password event
 class ForgotPasswordEvent extends AuthEvent {
   /// Email
