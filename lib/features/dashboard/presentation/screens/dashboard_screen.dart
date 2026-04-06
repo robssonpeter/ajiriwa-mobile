@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/navigation/app_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/bloc.dart';
 import '../../domain/entities/dashboard.dart';
 import '../bloc/bloc.dart';
@@ -23,9 +24,7 @@ class DashboardScreen extends StatelessWidget {
           context.read<DashboardBloc>().add(LoadDashboardEvent());
 
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Dashboard'),
-            ),
+            backgroundColor: Colors.grey.shade50,
             body: SafeArea(
               child: BlocBuilder<DashboardBloc, DashboardState>(
                 builder: (context, state) {
@@ -86,6 +85,8 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildDashboardContent(BuildContext context, String userName, Dashboard dashboard) {
+    final firstName = userName.split(' ').first;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -93,43 +94,65 @@ class DashboardScreen extends StatelessWidget {
         children: [
           // Greeting section
           Text(
-            'Hello, $userName!',
+            'Good Afternoon,',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade900,
+            ),
+          ),
+          Text(
+            firstName,
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Welcome to Ajiriwa',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
+              color: AppTheme.primaryColor,
             ),
           ),
           const SizedBox(height: 24),
 
-          // Profile completion card
-          _buildProfileCompletionCard(context, dashboard.profileCompletion),
-          const SizedBox(height: 24),
+          // Quick Action Cards
+          _buildQuickActionsGrid(context),
+          const SizedBox(height: 32),
+
+          // Auto-Apply Status Card
+          if (dashboard.autoApplySettings != null) ...[
+            _buildAutoApplyStatusCard(context, dashboard),
+            const SizedBox(height: 32),
+          ],
+
+          // Profile completion card (as a fallback or secondary info)
+          if (dashboard.profileCompletion.percentage < 100) ...[
+            _buildProfileCompletionCard(context, dashboard.profileCompletion),
+            const SizedBox(height: 32),
+          ],
 
           // Recommended jobs section
-          const Text(
-            'Recommended Jobs',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recommended Jobs',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.goNamed('jobs'),
+                child: const Text('See All'),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           _buildRecommendedJobsList(dashboard.recommendedJobs),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
           // Recent applications section
           const Text(
             'Recent Applications',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -140,47 +163,97 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileCompletionCard(BuildContext context, ProfileCompletion profileCompletion) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Profile Completion',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+  Widget _buildQuickActionsGrid(BuildContext context) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 3,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 0.9,
+      children: [
+        _buildQuickActionCard(
+          context,
+          icon: Icons.person_outline,
+          label: 'My Profile',
+          onTap: () => context.goNamed(AppRouter.profile),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.work_outline,
+          label: 'Browse Jobs',
+          onTap: () => context.goNamed('jobs'),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.edit_note,
+          label: 'Update Profile',
+          onTap: () => context.pushNamed('resume_edit'),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.send_outlined,
+          label: 'Applications',
+          onTap: () => context.goNamed('applications'),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.description_outlined,
+          label: 'CV Assistant',
+          onTap: () => context.pushNamed('cv_builder'),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.bolt,
+          label: 'Auto-Apply',
+          onTap: () => context.pushNamed('auto_apply'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: profileCompletion.percentage / 100,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.primary,
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, color: AppTheme.primaryColor, size: 24),
             ),
             const SizedBox(height: 8),
-            Text('${profileCompletion.percentage}% Complete'),
-            if (profileCompletion.missingSections.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Missing: ${profileCompletion.missingSections.join(', ')}',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                ),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
               ),
-            ],
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                // Navigate to profile screen
-                context.goNamed(AppRouter.profile);
-              },
-              child: const Text('Complete Your Profile'),
             ),
           ],
         ),
@@ -188,143 +261,441 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAutoApplyStatusCard(BuildContext context, Dashboard dashboard) {
+    final isEnabled = dashboard.autoApplySettings?.enabled ?? false;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Auto-Apply Status',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isEnabled ? Colors.green.shade50 : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isEnabled ? Colors.green : Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isEnabled ? 'Active' : 'Inactive',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isEnabled ? Colors.green.shade700 : Colors.red.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    _buildStatItem(
+                      context,
+                      icon: Icons.search,
+                      color: Colors.blue,
+                      label: 'Jobs Found',
+                      value: dashboard.jobMatchCount.toString(),
+                      sublabel: 'Matching criteria',
+                    ),
+                    _buildStatItem(
+                      context,
+                      icon: Icons.check_circle_outline,
+                      color: Colors.green,
+                      label: 'Jobs Applied',
+                      value: dashboard.autoAppliedCount.toString(),
+                      sublabel: 'Automatically',
+                    ),
+                    _buildStatItem(
+                      context,
+                      icon: Icons.bar_chart,
+                      color: Colors.purple,
+                      label: 'Success Rate',
+                      value: '28%', // Hardcoded for now as in web
+                      sublabel: 'Responses',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Colors.grey.shade100),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextButton.icon(
+              onPressed: () => context.pushNamed('auto_apply'),
+              icon: const Icon(Icons.settings, size: 18),
+              label: const Text('Manage Auto-Apply'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+    required String sublabel,
+  }) {
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 14),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            sublabel,
+            style: TextStyle(
+              fontSize: 8,
+              color: Colors.grey.shade400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCompletionCard(BuildContext context, ProfileCompletion profileCompletion) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Profile Completion',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${profileCompletion.percentage}%',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: profileCompletion.percentage / 100,
+              minHeight: 8,
+              backgroundColor: Colors.grey.shade100,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+            ),
+          ),
+          if (profileCompletion.missingSections.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Missing: ${profileCompletion.missingSections.join(', ')}',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => context.goNamed(AppRouter.profile),
+            child: const Text('Complete Your Profile'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecommendedJobsList(List<RecommendedJob> jobs) {
     if (jobs.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(
-            child: Text('No recommended jobs found'),
-          ),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Center(
+          child: Text('No recommended jobs found'),
         ),
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: jobs.length,
-      itemBuilder: (context, index) {
-        final job = jobs[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: ListTile(
-            leading: _buildCompanyLogo(job.company),
-            title: Text(job.title),
-            subtitle: Text('${job.company.name} • ${job.location}'),
-            trailing: IconButton(
-              icon: Icon(
-                job.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                color: job.isSaved ? Theme.of(context).colorScheme.primary : null,
-              ),
-              onPressed: () {
-                // TODO: Implement save job functionality
-              },
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: jobs.length,
+        itemBuilder: (context, index) {
+          final job = jobs[index];
+          return Container(
+            width: 160,
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade100),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            onTap: () {
-              // Navigate to job details screen with the job slug
-              if (job.slug != null) {
-                context.pushNamed(
-                  'job_view',
-                  pathParameters: {'slug': job.slug!},
-                );
-              } else {
-                // Show error message if slug is not available
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Job details not available'),
-                  ),
-                );
-              }
-            },
-          ),
-        );
-      },
+            child: InkWell(
+              onTap: () {
+                if (job.slug != null) {
+                  context.pushNamed(
+                    'job_view',
+                    pathParameters: {'slug': job.slug!},
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      job.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: _buildCompanyLogo(job.company, size: 60),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      job.company.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'New',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildRecentApplicationsList(List<RecentApplication> applications) {
     if (applications.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(
-            child: Text('No recent applications found'),
-          ),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Center(
+          child: Text('No recent applications found'),
         ),
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: applications.length,
-      itemBuilder: (context, index) {
-        final application = applications[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
+    return Column(
+      children: applications.map((application) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: application.job != null 
-                ? _buildCompanyLogo(application.job!.company)
+                ? _buildCompanyLogo(application.job!.company, size: 48)
                 : CircleAvatar(
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: Colors.grey.shade100,
                     child: const Icon(Icons.work_outline, color: Colors.grey),
                   ),
-            title: application.job != null 
-                ? Text(application.job!.title)
-                : const Text('Job no longer available'),
-            subtitle: Text('Status: ${_getStatusText(application.status)}'),
-            trailing: const Icon(Icons.chevron_right),
+            title: Text(
+              application.job?.title ?? 'Job no longer available',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Row(
+              children: [
+                Text(
+                  'Status: ',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+                Text(
+                  _getStatusText(application.status),
+                  style: TextStyle(
+                    fontSize: 12, 
+                    fontWeight: FontWeight.bold,
+                    color: _getStatusColor(application.status),
+                  ),
+                ),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
             onTap: () {
-              // TODO: Navigate to application details
+              // Navigate to application details
             },
           ),
         );
-      },
+      }).toList(),
     );
   }
 
   String _getStatusText(int status) {
-    // Convert status code to readable string
     switch (status) {
-      case 1:
-        return 'Submitted';
-      case 2:
-        return 'In Review';
-      case 3:
-        return 'Rejected';
-      case 4:
-        return 'Accepted';
-      default:
-        return 'Unknown';
+      case 1: return 'Submitted';
+      case 2: return 'In Review';
+      case 3: return 'Rejected';
+      case 4: return 'Accepted';
+      default: return 'Unknown';
     }
   }
 
-  Widget _buildCompanyLogo(Company company) {
+  Color _getStatusColor(int status) {
+    switch (status) {
+      case 1: return Colors.blue;
+      case 2: return Colors.orange;
+      case 3: return Colors.red;
+      case 4: return Colors.green;
+      default: return Colors.grey;
+    }
+  }
+
+  Widget _buildCompanyLogo(Company company, {double size = 40}) {
     final logoUrl = company.effectiveLogoUrl;
 
-    if (logoUrl == null) {
-      // Display a placeholder if no logo URL is available
-      return CircleAvatar(
-        backgroundColor: Colors.grey.shade200,
-        child: Text(
-          company.name.isNotEmpty ? company.name[0].toUpperCase() : '?',
-          style: const TextStyle(
-            color: Colors.grey,
-            fontWeight: FontWeight.bold,
-          ),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: logoUrl != null
+            ? Image.network(
+                logoUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => _buildPlaceholder(company.name),
+              )
+            : _buildPlaceholder(company.name),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(String name) {
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: Colors.grey,
+          fontWeight: FontWeight.bold,
         ),
-      );
-    } else {
-      // Display the company logo
-      return CircleAvatar(
-        backgroundColor: Colors.white,
-        backgroundImage: NetworkImage(logoUrl),
-        onBackgroundImageError: (exception, stackTrace) {
-          // Handle image loading errors
-          print('Error loading company logo: $exception');
-        },
-      );
-    }
+      ),
+    );
   }
 }

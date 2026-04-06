@@ -11,11 +11,23 @@ class DashboardModel extends Equatable {
   /// List of recent applications
   final List<RecentApplicationModel> recentApplications;
 
+  /// Auto-apply settings
+  final AutoApplySettingsModel? autoApplySettings;
+
+  /// Job match count
+  final int jobMatchCount;
+
+  /// Auto-applied count
+  final int autoAppliedCount;
+
   /// Constructor
   const DashboardModel({
     required this.profileCompletion,
     required this.recommendedJobs,
     required this.recentApplications,
+    this.autoApplySettings,
+    required this.jobMatchCount,
+    required this.autoAppliedCount,
   });
 
   /// Create a dashboard model from JSON
@@ -30,6 +42,11 @@ class DashboardModel extends Equatable {
       recentApplications: (json['recent_applications'] as List)
           .map((app) => RecentApplicationModel.fromJson(app as Map<String, dynamic>))
           .toList(),
+      autoApplySettings: json['auto_apply_settings'] != null
+          ? AutoApplySettingsModel.fromJson(json['auto_apply_settings'] as Map<String, dynamic>)
+          : null,
+      jobMatchCount: json['job_match_count'] as int? ?? 0,
+      autoAppliedCount: json['auto_applied_count'] as int? ?? 0,
     );
   }
 
@@ -38,7 +55,31 @@ class DashboardModel extends Equatable {
         profileCompletion,
         recommendedJobs,
         recentApplications,
+        autoApplySettings,
+        jobMatchCount,
+        autoAppliedCount,
       ];
+}
+
+/// Auto-apply settings model
+class AutoApplySettingsModel extends Equatable {
+  /// Whether auto-apply is enabled
+  final bool enabled;
+
+  /// Constructor
+  const AutoApplySettingsModel({
+    required this.enabled,
+  });
+
+  /// Create an auto-apply settings model from JSON
+  factory AutoApplySettingsModel.fromJson(Map<String, dynamic> json) {
+    return AutoApplySettingsModel(
+      enabled: json['enabled'] as bool? ?? false,
+    );
+  }
+
+  @override
+  List<Object?> get props => [enabled];
 }
 
 /// Profile completion model

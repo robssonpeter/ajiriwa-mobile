@@ -11,11 +11,23 @@ class Dashboard extends Equatable {
   /// List of recent applications
   final List<RecentApplication> recentApplications;
 
+  /// Auto-apply settings
+  final AutoApplySettings? autoApplySettings;
+
+  /// Job match count
+  final int jobMatchCount;
+
+  /// Auto-applied count
+  final int autoAppliedCount;
+
   /// Constructor
   const Dashboard({
     required this.profileCompletion,
     required this.recommendedJobs,
     required this.recentApplications,
+    this.autoApplySettings,
+    required this.jobMatchCount,
+    required this.autoAppliedCount,
   });
 
   @override
@@ -23,7 +35,24 @@ class Dashboard extends Equatable {
         profileCompletion,
         recommendedJobs,
         recentApplications,
+        autoApplySettings,
+        jobMatchCount,
+        autoAppliedCount,
       ];
+}
+
+/// Auto-apply settings entity
+class AutoApplySettings extends Equatable {
+  /// Whether auto-apply is enabled
+  final bool enabled;
+
+  /// Constructor
+  const AutoApplySettings({
+    required this.enabled,
+  });
+
+  @override
+  List<Object?> get props => [enabled];
 }
 
 /// Profile completion entity

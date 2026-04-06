@@ -88,6 +88,11 @@ class DashboardRepositoryImpl implements DashboardRepository {
                   ))
               .toList(),
           recentApplications: _mapRecentApplications(dashboardModel.recentApplications),
+          autoApplySettings: dashboardModel.autoApplySettings != null
+              ? AutoApplySettings(enabled: dashboardModel.autoApplySettings!.enabled)
+              : null,
+          jobMatchCount: dashboardModel.jobMatchCount,
+          autoAppliedCount: dashboardModel.autoAppliedCount,
         );
         return Right(dashboard);
       } on ServerException catch (e) {
