@@ -81,6 +81,7 @@ class DashboardScreen extends StatelessWidget {
           );
         }
       },
+      ),
     );
   }
 
