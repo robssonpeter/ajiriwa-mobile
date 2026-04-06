@@ -1,17 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/navigation/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/bloc/bloc.dart';
 import '../../domain/entities/dashboard.dart';
 import '../bloc/bloc.dart';
 
 /// Dashboard screen - the main screen of the app
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   /// Constructor
   const DashboardScreen({Key? key}) : super(key: key);
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger dashboard loading when screen is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        context.read<DashboardBloc>().add(LoadDashboardEvent());
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,69 +51,112 @@ class DashboardScreen extends StatelessWidget {
                 child: BlocBuilder<DashboardBloc, DashboardState>(
                   builder: (context, state) {
                     if (state is DashboardLoading) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
+                      return _buildSkeletonDashboard();
                     } else if (state is DashboardLoaded) {
                       final dashboard = state.dashboard;
                       return _buildDashboardContent(context, user.name, dashboard, user);
                     } else if (state is DashboardError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Error: ${state.message}',
-                            style: const TextStyle(color: Colors.red),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<DashboardBloc>().add(LoadDashboardEvent());
-                            },
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else {
-                    // Initial state, show loading
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                },
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Oops! Something went wrong',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 32),
+                              child: Text(
+                                state.message,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                context.read<DashboardBloc>().add(LoadDashboardEvent());
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Try Again'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      // Initial state, trigger loading if authenticated
+                      if (authState is Authenticated) {
+                        // This should not happen now since we trigger loading in initState
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          context.read<DashboardBloc>().add(LoadDashboardEvent());
+                        });
+                      }
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                  },
+                ),
               ),
-            ),
-          );
-        } else if (authState is AuthLoading) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        } else {
-          // If not authenticated, the router will redirect to login
-          Future.microtask(() => context.goNamed(AppRouter.login));
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-      },
+            );
+          } else if (authState is AuthLoading) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          } else {
+            // If not authenticated, the router will redirect to login
+            Future.microtask(() => context.goNamed(AppRouter.login));
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 
   Widget _buildDashboardContent(BuildContext context, String userName, Dashboard dashboard, User user) {
     final firstName = userName.split(' ').first;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<DashboardBloc>().add(LoadDashboardEvent());
+        // Wait for the loading to complete
+        await Future.delayed(const Duration(milliseconds: 500));
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Profile Switcher (Compact)
           if (user.candidates != null && user.candidates!.length > 1) ...[
             _buildProfileSwitcherCompact(context, user),
@@ -167,14 +229,15 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildRecentApplicationsList(dashboard.recentApplications),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProfileSwitcherCompact(BuildContext context, User user) {
     final selectedCandidate = user.candidates?.firstWhere(
-      (c) => c['id'] == user.selectedCandidateId,
+          (c) => c['id'] == user.selectedCandidateId,
       orElse: () => user.candidates!.first,
     );
 
@@ -187,7 +250,7 @@ class DashboardScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.primaryColor.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: BorderSide(color: AppTheme.primaryColor.withOpacity(0.1)),
+          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
         ),
         child: Row(
           children: [
@@ -252,7 +315,7 @@ class DashboardScreen extends StatelessWidget {
 
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: isSelected 
+                          backgroundColor: isSelected
                               ? AppTheme.primaryColor.withOpacity(0.1)
                               : Colors.grey.shade100,
                           child: Icon(
@@ -267,7 +330,7 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         ),
                         subtitle: candidate['title'] != null ? Text(candidate['title']) : null,
-                        trailing: isSelected 
+                        trailing: isSelected
                             ? const Icon(Icons.check_circle, color: AppTheme.primaryColor)
                             : null,
                         onTap: () {
@@ -338,11 +401,11 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildQuickActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required String label,
+        required VoidCallback onTap,
+      }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -494,13 +557,13 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildStatItem(
-    BuildContext context, {
-    required IconData icon,
-    required Color color,
-    required String label,
-    required String value,
-    required String sublabel,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required Color color,
+        required String label,
+        required String value,
+        required String sublabel,
+      }) {
     return Expanded(
       child: Column(
         children: [
@@ -732,12 +795,12 @@ class DashboardScreen extends StatelessWidget {
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: application.job != null 
+            leading: application.job != null
                 ? _buildCompanyLogo(application.job!.company, size: 48)
                 : CircleAvatar(
-                    backgroundColor: Colors.grey.shade100,
-                    child: const Icon(Icons.work_outline, color: Colors.grey),
-                  ),
+              backgroundColor: Colors.grey.shade100,
+              child: const Icon(Icons.work_outline, color: Colors.grey),
+            ),
             title: Text(
               application.job?.title ?? 'Job no longer available',
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -751,7 +814,7 @@ class DashboardScreen extends StatelessWidget {
                 Text(
                   _getStatusText(application.status),
                   style: TextStyle(
-                    fontSize: 12, 
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: _getStatusColor(application.status),
                   ),
@@ -803,10 +866,10 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: logoUrl != null
             ? Image.network(
-                logoUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => _buildPlaceholder(company.name),
-              )
+          logoUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(company.name),
+        )
             : _buildPlaceholder(company.name),
       ),
     );
@@ -820,6 +883,369 @@ class DashboardScreen extends StatelessWidget {
           color: Colors.grey,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  /// Build skeleton loading UI for the entire dashboard
+  Widget _buildSkeletonDashboard() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting section skeleton
+          _buildSkeletonGreeting(),
+          const SizedBox(height: 24),
+
+          // Quick actions skeleton
+          _buildSkeletonQuickActions(),
+          const SizedBox(height: 32),
+
+          // Profile completion card skeleton
+          _buildSkeletonProfileCompletion(),
+          const SizedBox(height: 32),
+
+          // Recommended jobs section skeleton
+          _buildSkeletonSectionHeader(),
+          const SizedBox(height: 16),
+          _buildSkeletonRecommendedJobs(),
+          const SizedBox(height: 32),
+
+          // Recent applications section skeleton
+          _buildSkeletonSectionHeader(),
+          const SizedBox(height: 16),
+          _buildSkeletonRecentApplications(),
+        ],
+      ),
+    );
+  }
+
+  /// Build skeleton for greeting section
+  Widget _buildSkeletonGreeting() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 200,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 150,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build skeleton for quick actions grid
+  Widget _buildSkeletonQuickActions() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.5,
+        children: List.generate(4, (index) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 80,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  /// Build skeleton for profile completion card
+  Widget _buildSkeletonProfileCompletion() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 180,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: 120,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build skeleton for section headers
+  Widget _buildSkeletonSectionHeader() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 180,
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          Container(
+            width: 60,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build skeleton for recommended jobs list
+  Widget _buildSkeletonRecommendedJobs() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: SizedBox(
+        height: 200,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: 3,
+          itemBuilder: (context, index) {
+            return Container(
+              width: 280,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                width: 120,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 100,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        Container(
+                          width: 60,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Build skeleton for recent applications list
+  Widget _buildSkeletonRecentApplications() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        children: List.generate(3, (index) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              title: Container(
+                width: double.infinity,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              subtitle: Container(
+                width: 120,
+                height: 12,
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              trailing: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

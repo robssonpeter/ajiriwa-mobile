@@ -20,10 +20,40 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     Emitter<DashboardState> emit,
   ) async {
     emit(DashboardLoading());
-    final result = await dashboardRepository.getDashboard();
-    result.fold(
-      (failure) => emit(DashboardError(failure.toString())),
-      (dashboard) => emit(DashboardLoaded(dashboard)),
-    );
+
+    try {
+      // Add timeout to prevent indefinite loading
+      final result = await dashboardRepository.getDashboard().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timed out. Please check your internet connection and try again.');
+        },
+      );
+
+      result.fold(
+        (failure) {
+          // Provide more user-friendly error messages
+          String errorMessage;
+          if (failure.toString().contains('NetworkFailure')) {
+            errorMessage = 'No internet connection. Please check your network and try again.';
+          } else if (failure.toString().contains('ServerFailure')) {
+            errorMessage = 'Server error occurred. Please try again later.';
+          } else {
+            errorMessage = 'Something went wrong. Please try again.';
+          }
+          emit(DashboardError(errorMessage));
+        },
+        (dashboard) => emit(DashboardLoaded(dashboard)),
+      );
+    } catch (e) {
+      // Handle timeout and other unexpected errors
+      String errorMessage;
+      if (e.toString().contains('timed out')) {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else {
+        errorMessage = 'An unexpected error occurred. Please try again.';
+      }
+      emit(DashboardError(errorMessage));
+    }
   }
 }

@@ -317,4 +317,30 @@ class JobRepositoryImpl implements JobRepository {
       return const Left(NetworkFailure('No internet connection'));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> generateCoverLetter({
+    required int jobId,
+    String? startingPoint,
+    String? refineInstructions,
+    int? candidateId,
+  }) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final response = await remoteDataSource.generateCoverLetter(
+          jobId: jobId,
+          startingPoint: startingPoint,
+          refineInstructions: refineInstructions,
+          candidateId: candidateId,
+        );
+        return Right(response);
+      } on ServerException catch (e) {
+        return Left(ServerFailure(e.message));
+      } catch (e) {
+        return Left(ServerFailure('An unexpected error occurred: ${e.toString()}'));
+      }
+    } else {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+  }
 }
