@@ -115,10 +115,12 @@ class ProfileScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 50,
                 backgroundColor: Colors.grey.shade200,
-                backgroundImage: user.photoUrl != null
+                backgroundImage: user.photoUrl != null &&
+                        !user.photoUrl!.contains('ui-avatars.com')
                     ? NetworkImage(user.photoUrl!)
                     : null,
-                child: user.photoUrl == null
+                child: user.photoUrl == null ||
+                        user.photoUrl!.contains('ui-avatars.com')
                     ? Text(
                         user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
                         style: const TextStyle(
