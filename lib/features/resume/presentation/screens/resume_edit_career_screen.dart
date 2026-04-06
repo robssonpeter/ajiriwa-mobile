@@ -136,7 +136,7 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
                                 shouldEnsureVisible: true,
                                 autoAdjustHeight: true,
                                 adjustHeightForKeyboard: true,
-                                initialHeight: 250,
+                                height: 250,
                               ),
                               htmlToolbarOptions: HtmlToolbarOptions(
                                 toolbarPosition: ToolbarPosition.aboveEditor,
