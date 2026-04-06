@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../../core/navigation/app_router.dart';
 import '../../domain/entities/entities.dart';
@@ -11,7 +10,6 @@ import '../widgets/resume_edit_navigation_widget.dart';
 
 /// Resume edit experience screen - for editing work experience
 class ResumeEditExperienceScreen extends StatefulWidget {
-  /// Constructor
   const ResumeEditExperienceScreen({Key? key}) : super(key: key);
 
   @override
@@ -19,90 +17,316 @@ class ResumeEditExperienceScreen extends StatefulWidget {
 }
 
 class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen> {
-  // Profile completion percentage
-  int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // List of experiences
   List<Experience> _experiences = [];
-
-  // Map of countries
   Map<String, dynamic> _countries = {};
-
-  // Map of industries
   List<Map<String, dynamic>> _industries = [];
-
-  // Resume bloc instance
   late ResumeBloc resumeBloc;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the resumeBloc
     resumeBloc = context.read<ResumeBloc>();
-    // Fetch experience information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       resumeBloc.add(const GetResumeSection(section: 'experience'));
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Work Experience'),
+  void _showExperienceSheet(BuildContext context, {Experience? existing}) {
+    final formKey = GlobalKey<FormState>();
+    final jobTitleCtrl = TextEditingController(text: existing?.jobTitle ?? '');
+    final companyCtrl = TextEditingController(text: existing?.company ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
+    String? selectedCountry = existing?.location?.toUpperCase();
+    DateTime? startDate = existing?.startDate != null && existing!.startDate.isNotEmpty
+        ? DateTime.tryParse(existing.startDate)
+        : null;
+    DateTime? endDate = existing?.endDate != null && existing!.endDate!.isNotEmpty
+        ? DateTime.tryParse(existing.endDate!)
+        : null;
+    bool isCurrent = existing?.isCurrent ?? false;
+    bool isSaving = false;
+
+    final primary = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: resumeBloc,
+        child: BlocListener<ResumeBloc, ResumeState>(
+          listener: (ctx2, state) {
+            if (state is ExperienceAdded || state is ExperienceUpdated) {
+              Navigator.of(ctx).pop();
+            }
+          },
+          child: StatefulBuilder(
+            builder: (ctx3, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(ctx3).viewInsets.bottom),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx3).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Handle
+                      Container(
+                        margin: const EdgeInsets.only(top: 12, bottom: 4),
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.work_outline, color: primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              existing == null ? 'Add Work Experience' : 'Edit Work Experience',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Form(
+                            key: formKey,
+                            child: Column(
+                              children: [
+                                TextFormField(
+                                  controller: jobTitleCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Job Title *',
+                                    prefixIcon: Icon(Icons.badge_outlined),
+                                  ),
+                                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                  textCapitalization: TextCapitalization.words,
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: companyCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Company *',
+                                    prefixIcon: Icon(Icons.business_outlined),
+                                  ),
+                                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                  textCapitalization: TextCapitalization.words,
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: _countries.isEmpty || selectedCountry == null
+                                      ? null
+                                      : (_countries.keys.any((k) => k.toUpperCase() == selectedCountry) ? selectedCountry : null),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Country',
+                                    prefixIcon: Icon(Icons.flag_outlined),
+                                  ),
+                                  isExpanded: true,
+                                  items: _countries.entries.map((e) {
+                                    final data = e.value as Map<String, dynamic>?;
+                                    final name = data?['name'] as String? ?? e.key.toUpperCase();
+                                    final emoji = data?['emoji'] as String?;
+                                    return DropdownMenuItem<String>(
+                                      value: e.key.toUpperCase(),
+                                      child: Text(emoji != null ? '$emoji  $name' : name, overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setSheetState(() => selectedCountry = v),
+                                ),
+                                const SizedBox(height: 12),
+                                // Start Date
+                                GestureDetector(
+                                  onTap: () async {
+                                    final d = await showDatePicker(
+                                      context: ctx3,
+                                      initialDate: startDate ?? DateTime.now(),
+                                      firstDate: DateTime(1900),
+                                      lastDate: DateTime.now(),
+                                    );
+                                    if (d != null) setSheetState(() => startDate = d);
+                                  },
+                                  child: AbsorbPointer(
+                                    child: TextFormField(
+                                      decoration: const InputDecoration(
+                                        labelText: 'Start Date *',
+                                        prefixIcon: Icon(Icons.calendar_today_outlined),
+                                      ),
+                                      controller: TextEditingController(
+                                        text: startDate != null ? DateFormat('MMM yyyy').format(startDate!) : '',
+                                      ),
+                                      validator: (_) => startDate == null ? 'Required' : null,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SwitchListTile(
+                                  title: const Text('I currently work here', style: TextStyle(fontSize: 14)),
+                                  value: isCurrent,
+                                  activeColor: primary,
+                                  contentPadding: EdgeInsets.zero,
+                                  onChanged: (v) => setSheetState(() {
+                                    isCurrent = v;
+                                    if (isCurrent) endDate = null;
+                                  }),
+                                ),
+                                if (!isCurrent) ...[
+                                  GestureDetector(
+                                    onTap: () async {
+                                      final d = await showDatePicker(
+                                        context: ctx3,
+                                        initialDate: endDate ?? DateTime.now(),
+                                        firstDate: startDate ?? DateTime(1900),
+                                        lastDate: DateTime.now(),
+                                      );
+                                      if (d != null) setSheetState(() => endDate = d);
+                                    },
+                                    child: AbsorbPointer(
+                                      child: TextFormField(
+                                        decoration: const InputDecoration(
+                                          labelText: 'End Date *',
+                                          prefixIcon: Icon(Icons.calendar_today_outlined),
+                                        ),
+                                        controller: TextEditingController(
+                                          text: endDate != null ? DateFormat('MMM yyyy').format(endDate!) : '',
+                                        ),
+                                        validator: (_) => (!isCurrent && endDate == null) ? 'Required' : null,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                TextFormField(
+                                  controller: descCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Description',
+                                    prefixIcon: Icon(Icons.notes_outlined),
+                                    alignLabelWithHint: true,
+                                  ),
+                                  maxLines: 4,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: isSaving
+                                      ? null
+                                      : () {
+                                          if (formKey.currentState!.validate()) {
+                                            setSheetState(() => isSaving = true);
+                                            final exp = Experience(
+                                              id: existing?.id,
+                                              jobTitle: jobTitleCtrl.text,
+                                              company: companyCtrl.text,
+                                              startDate: startDate != null ? DateFormat('yyyy-MM-dd').format(startDate!) : '',
+                                              endDate: endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : null,
+                                              isCurrent: isCurrent,
+                                              description: descCtrl.text.isNotEmpty ? descCtrl.text : null,
+                                              location: selectedCountry?.toLowerCase(),
+                                            );
+                                            if (existing == null) {
+                                              resumeBloc.add(AddExperience(experience: exp, candidateId: _candidateId));
+                                            } else {
+                                              resumeBloc.add(UpdateExperience(experience: exp, candidateId: _candidateId));
+                                            }
+                                          }
+                                        },
+                                  icon: isSaving
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Icon(Icons.save_outlined),
+                                  label: Text(isSaving ? 'Saving...' : 'Save Experience'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: const Size(double.infinity, 48),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Experience exp) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Experience'),
+        content: Text('Remove "${exp.jobTitle}" at ${exp.company}?'),
         actions: [
-          // Keep the next button
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              // Navigate to next section (education)
-              context.goNamed(AppRouter.resumeEditEducation);
+              Navigator.pop(ctx);
+              resumeBloc.add(DeleteExperience(experienceId: exp.id!, candidateId: _candidateId));
             },
-            child: const Row(
-              children: [
-                Text('Next', style: TextStyle(color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-              ],
-            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
-          // Add navigation menu (at the far right)
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditExperience),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate to previous section (career)
-            context.goNamed(AppRouter.resumeEditCareer);
-          },
+          onPressed: () => context.goNamed(AppRouter.resumeEditCareer),
         ),
+        actions: [
+          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditExperience),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showExperienceSheet(context),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Experience'),
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
           if (state is ResumeSectionLoaded) {
-            // Update profile completion, candidate ID, countries, and industries
             setState(() {
-              _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
               _countries = state.response.countries ?? {};
               _industries = state.response.industries ?? [];
-
-              // Get experience list from response
-              final experienceList = state.response.data['experience'] as List<dynamic>?;
-              if (experienceList != null) {
-                _experiences = experienceList.map((e) {
-                  final exp = e as Map<String, dynamic>;
+              final list = state.response.data['experience'] as List<dynamic>?;
+              if (list != null) {
+                _experiences = list.map((e) {
+                  final m = e as Map<String, dynamic>;
                   return Experience(
-                    id: exp['id'] as int?,
-                    jobTitle: exp['title'] as String? ?? '',
-                    company: exp['company'] as String? ?? '',
-                    startDate: exp['start_date'] as String? ?? '',
-                    endDate: exp['end_date'] as String?,
-                    isCurrent: (exp['currently_working'] as int?) == 1,
-                    description: exp['description'] as String?,
-                    location: exp['country'] as String?,
+                    id: m['id'] as int?,
+                    jobTitle: m['title'] as String? ?? '',
+                    company: m['company'] as String? ?? '',
+                    startDate: m['start_date'] as String? ?? '',
+                    endDate: m['end_date'] as String?,
+                    isCurrent: (m['currently_working'] as int?) == 1,
+                    description: m['description'] as String?,
+                    location: m['country'] as String?,
                   );
                 }).toList();
               } else {
@@ -110,890 +334,173 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
               }
             });
           } else if (state is ExperienceAdded) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Experience added successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the experience list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Experience added!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'experience'));
           } else if (state is ExperienceUpdated) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Experience updated successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the experience list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Experience updated!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'experience'));
           } else if (state is ExperienceDeleted) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Experience deleted successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the experience list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Experience removed!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'experience'));
           } else if (state is ResumeError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(state.message), backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
           }
         },
         builder: (context, state) {
-          // Show loading indicator only when initially loading the section
-          // Not when adding, updating, or deleting experiences
           if (state is ResumeLoading && _experiences.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile completion indicator
-                LinearProgressIndicator(value: _profileCompletion / 100),
-                const SizedBox(height: 8),
-                Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-
-                // Work experience list
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditExperience),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    const Text(
-                      'Work Experience',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const ResumeSectionHeader(
+                      title: 'Work Experience',
+                      icon: Icons.work_outline,
+                      subtitle: 'Add your professional work history',
                     ),
-                    SizedBox(
-                      width: 100, // Fixed width to avoid infinite constraints
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Show add experience dialog/screen
-                          _showAddExperienceDialog(context);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+
+                    if (_experiences.isEmpty)
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Icon(Icons.work_off_outlined, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text('No work experience added yet',
+                                style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text('Tap the button below to add your first experience',
+                                style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () => _showExperienceSheet(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Experience'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary,
+                                side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Experience list
-                if (_experiences.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'No work experience added yet. Click the "Add" button to add your work experience.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _experiences.length,
-                    itemBuilder: (context, index) {
-                      final experience = _experiences[index];
-                      final countryCode = experience.location?.toLowerCase();
-                      String countryName = countryCode ?? '';
-                      if (countryCode != null && _countries.containsKey(countryCode)) {
-                        final countryData = _countries[countryCode] as Map<String, dynamic>?;
-                        if (countryData != null) {
-                          countryName = countryData['name'] as String? ?? countryCode;
+                      )
+                    else
+                      ..._experiences.map((exp) {
+                        final countryCode = exp.location?.toLowerCase();
+                        String countryName = '';
+                        if (countryCode != null && _countries.containsKey(countryCode)) {
+                          final d = _countries[countryCode] as Map<String, dynamic>?;
+                          countryName = d?['name'] as String? ?? countryCode;
                         }
-                      }
+                        String startStr = '';
+                        String endStr = '';
+                        try {
+                          if (exp.startDate.isNotEmpty) startStr = DateFormat('MMM yyyy').format(DateTime.parse(exp.startDate));
+                          endStr = exp.isCurrent ? 'Present' : (exp.endDate != null && exp.endDate!.isNotEmpty ? DateFormat('MMM yyyy').format(DateTime.parse(exp.endDate!)) : '');
+                        } catch (_) {}
 
-                      // Format dates
-                      final startDate = experience.startDate.isNotEmpty
-                          ? DateFormat('MMMM yyyy').format(DateTime.parse(experience.startDate))
-                          : '';
-                      final endDate = experience.isCurrent
-                          ? 'Present'
-                          : (experience.endDate != null && experience.endDate!.isNotEmpty
-                              ? DateFormat('MMMM yyyy').format(DateTime.parse(experience.endDate!))
-                              : '');
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      experience.jobTitle,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40, height: 40,
+                                      decoration: BoxDecoration(color: primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                      child: Icon(Icons.work_outline, color: primary, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(exp.jobTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                          Text(exp.company, style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () {
-                                          _showEditExperienceDialog(context, experience);
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () {
-                                          _showDeleteConfirmationDialog(context, experience);
-                                        },
-                                      ),
+                                    PopupMenuButton<String>(
+                                      onSelected: (v) {
+                                        if (v == 'edit') _showExperienceSheet(context, existing: exp);
+                                        if (v == 'delete') _confirmDelete(context, exp);
+                                      },
+                                      itemBuilder: (_) => [
+                                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+                                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_outlined, size: 13, color: Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Text('$startStr – $endStr', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                    if (countryName.isNotEmpty) ...[
+                                      const SizedBox(width: 12),
+                                      Icon(Icons.location_on_outlined, size: 13, color: Colors.grey.shade500),
+                                      const SizedBox(width: 4),
+                                      Text(countryName, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                                     ],
+                                  ],
+                                ),
+                                if (exp.isCurrent)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                                      child: Text('Current', style: TextStyle(color: primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                experience.company,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$startDate - $endDate',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              if (countryName.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  countryName,
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                ),
                               ],
-                              if (experience.description != null && experience.description!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                const Divider(),
-                                const SizedBox(height: 8),
-                                Text(
-                                  experience.description!,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      }).toList(),
 
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Go back to previous section
-                          context.goNamed(AppRouter.resumeEditCareer);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Previous'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Save and navigate to next section
-                          context.goNamed(AppRouter.resumeEditEducation);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Save & Continue'),
-                        ),
-                      ),
+                    ResumeNavButtons(
+                      prevRoute: AppRouter.resumeEditCareer,
+                      nextRoute: AppRouter.resumeEditEducation,
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
-    );
-  }
-
-  void _showAddExperienceDialog(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-    final _jobTitleController = TextEditingController();
-    final _companyController = TextEditingController();
-    String? _selectedCountry;
-    DateTime? _startDate;
-    DateTime? _endDate;
-    bool _isCurrent = false;
-    final _descriptionController = TextEditingController();
-    bool _isSaving = false;
-
-    // Get the ResumeBloc instance from the context before showing the dialog
-    //final resumeBloc = context.read<ResumeBloc>();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ExperienceAdded) {
-                // Close dialog when experience is added
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Add Work Experience'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Job Title
-                        TextFormField(
-                          controller: _jobTitleController,
-                          decoration: const InputDecoration(
-                            labelText: 'Job Title *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter job title';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                      // Company
-                      TextFormField(
-                        controller: _companyController,
-                        decoration: const InputDecoration(
-                          labelText: 'Company *',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter company name';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Country
-                      DropdownButtonFormField<String>(
-                        value: _selectedCountry,
-                        decoration: const InputDecoration(
-                          labelText: 'Country',
-                          border: OutlineInputBorder(),
-                        ),
-                        isExpanded: true, // Ensure dropdown uses full width available
-                        items: _countries.isEmpty
-                            ? []
-                            : _countries.entries.map((entry) {
-                          final countryCode = entry.key;
-                          final countryData = entry.value as Map<String, dynamic>?;
-                          if (countryData == null) {
-                            return DropdownMenuItem<String>(
-                              value: countryCode.toUpperCase(),
-                              child: Text(countryCode.toUpperCase()),
-                            );
-                          }
-                          final countryName = countryData['name'] as String? ?? 'Unknown';
-                          final countryEmoji = countryData['emoji'] as String?;
-
-                          return DropdownMenuItem<String>(
-                            value: countryCode.toUpperCase(),
-                            child: Row(
-                              children: [
-                                if (countryEmoji != null) Text(countryEmoji + ' '),
-                                Flexible(
-                                  child: Text(
-                                    countryName,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          _selectedCountry = value;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Start Date
-                      GestureDetector(
-                        onTap: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _startDate ?? DateTime.now(),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime.now(),
-                          );
-                          if (date != null) {
-                            _startDate = date;
-                            // Force rebuild
-                            (context as Element).markNeedsBuild();
-                          }
-                        },
-                        child: AbsorbPointer(
-                          child: TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'Start Date *',
-                              border: OutlineInputBorder(),
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            controller: TextEditingController(
-                              text: _startDate != null
-                                  ? DateFormat('yyyy-MM-dd').format(_startDate!)
-                                  : '',
-                            ),
-                            validator: (value) {
-                              if (_startDate == null) {
-                                return 'Please select start date';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Currently Working
-                      CheckboxListTile(
-                        title: const Text('I currently work here'),
-                        value: _isCurrent,
-                        onChanged: (value) {
-                          _isCurrent = value ?? false;
-                          if (_isCurrent) {
-                            _endDate = null;
-                          }
-                          // Force rebuild
-                          (context as Element).markNeedsBuild();
-                        },
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // End Date (only if not current job)
-                      if (!_isCurrent)
-                        GestureDetector(
-                          onTap: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _endDate ?? DateTime.now(),
-                              firstDate: _startDate ?? DateTime(1900),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              _endDate = date;
-                              // Force rebuild
-                              (context as Element).markNeedsBuild();
-                            }
-                          },
-                          child: AbsorbPointer(
-                            child: TextFormField(
-                              decoration: const InputDecoration(
-                                labelText: 'End Date *',
-                                border: OutlineInputBorder(),
-                                suffixIcon: Icon(Icons.calendar_today),
-                              ),
-                              controller: TextEditingController(
-                                text: _endDate != null
-                                    ? DateFormat('yyyy-MM-dd').format(_endDate!)
-                                    : '',
-                              ),
-                              validator: (value) {
-                                if (!_isCurrent && _endDate == null) {
-                                  return 'Please select end date';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ),
-                      if (!_isCurrent)
-                        const SizedBox(height: 16),
-
-                      // Description
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
-                        ),
-                        maxLines: 5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isSaving
-                      ? null // Disable cancel button while saving
-                      : () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: _isSaving
-                      ? null // Disable save button while saving
-                      : () {
-                    if (_formKey.currentState!.validate()) {
-                      // Set saving state
-                      setState(() {
-                        _isSaving = true;
-                      });
-
-                      // Create experience entity
-                      final experience = Experience(
-                        jobTitle: _jobTitleController.text,
-                        company: _companyController.text,
-                        startDate: _startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : '',
-                        endDate: _isCurrent ? null : (_endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : null),
-                        isCurrent: _isCurrent,
-                        description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-                        location: _selectedCountry,
-                      );
-
-                      // Dispatch add event using the stored ResumeBloc instance
-                      resumeBloc.add(AddExperience(
-                        experience: experience,
-                        candidateId: _candidateId,
-                      ));
-
-                      // Note: Don't pop here, let the BlocListener handle it
-                    }
-                  },
-                  child: _isSaving
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text('Save'),
-                ),
-              ],
-            ),
-          ),
-          )
-        );
-      },
-    );
-  }
-
-  void _showEditExperienceDialog(BuildContext context, Experience experience) {
-    final _formKey = GlobalKey<FormState>();
-    final _jobTitleController = TextEditingController(text: experience.jobTitle);
-    final _companyController = TextEditingController(text: experience.company);
-    String? _selectedCountry = experience.location?.toUpperCase();
-    DateTime? _startDate = experience.startDate.isNotEmpty ? DateTime.tryParse(experience.startDate) : null;
-    DateTime? _endDate = experience.endDate != null && experience.endDate!.isNotEmpty ? DateTime.tryParse(experience.endDate!) : null;
-    bool _isCurrent = experience.isCurrent;
-    final _descriptionController = TextEditingController(text: experience.description ?? '');
-    bool _isSaving = false;
-
-    // Get the ResumeBloc instance from the context before showing the dialog
-    //final resumeBloc = context.read<ResumeBloc>();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ExperienceUpdated) {
-                // Close dialog when experience is updated
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Edit Work Experience'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                      // Job Title
-                      TextFormField(
-                        controller: _jobTitleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Job Title *',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter job title';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Company
-                      TextFormField(
-                        controller: _companyController,
-                        decoration: const InputDecoration(
-                          labelText: 'Company *',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter company name';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Country
-                      DropdownButtonFormField<String>(
-                        value: _countries.isEmpty || _selectedCountry == null ? null :
-                        (_countries.keys.any((k) => k.toUpperCase() == _selectedCountry) ? _selectedCountry : null),
-                        decoration: const InputDecoration(
-                          labelText: 'Country',
-                          border: OutlineInputBorder(),
-                        ),
-                        isExpanded: true, // Ensure dropdown uses full width available
-                        items: _countries.isEmpty
-                            ? []
-                            : _countries.entries.map((entry) {
-                          final countryCode = entry.key;
-                          final countryData = entry.value as Map<String, dynamic>?;
-                          if (countryData == null) {
-                            return DropdownMenuItem<String>(
-                              value: countryCode.toLowerCase(),
-                              child: Text(countryCode.toUpperCase()),
-                            );
-                          }
-                          final countryName = countryData['name'] as String? ?? 'Unknown';
-                          final countryEmoji = countryData['emoji'] as String?;
-
-                          return DropdownMenuItem<String>(
-                            value: countryCode.toLowerCase(),
-                            child: Row(
-                              children: [
-                                if (countryEmoji != null) Text(countryEmoji + ' '),
-                                Flexible(
-                                  child: Text(
-                                    countryName,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCountry = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Start Date
-                      GestureDetector(
-                        onTap: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _startDate ?? DateTime.now(),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime.now(),
-                          );
-                          if (date != null) {
-                            _startDate = date;
-                            // Force rebuild
-                            (context as Element).markNeedsBuild();
-                          }
-                        },
-                        child: AbsorbPointer(
-                          child: TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'Start Date *',
-                              border: OutlineInputBorder(),
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            controller: TextEditingController(
-                              text: _startDate != null
-                                  ? DateFormat('yyyy-MM-dd').format(_startDate!)
-                                  : '',
-                            ),
-                            validator: (value) {
-                              if (_startDate == null) {
-                                return 'Please select start date';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Currently Working
-                      CheckboxListTile(
-                        title: const Text('I currently work here'),
-                        value: _isCurrent,
-                        onChanged: (value) {
-                          _isCurrent = value ?? false;
-                          if (_isCurrent) {
-                            _endDate = null;
-                          }
-                          // Force rebuild
-                          (context as Element).markNeedsBuild();
-                        },
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // End Date (only if not current job)
-                      if (!_isCurrent)
-                        GestureDetector(
-                          onTap: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _endDate ?? DateTime.now(),
-                              firstDate: _startDate ?? DateTime(1900),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              _endDate = date;
-                              // Force rebuild
-                              (context as Element).markNeedsBuild();
-                            }
-                          },
-                          child: AbsorbPointer(
-                            child: TextFormField(
-                              decoration: const InputDecoration(
-                                labelText: 'End Date *',
-                                border: OutlineInputBorder(),
-                                suffixIcon: Icon(Icons.calendar_today),
-                              ),
-                              controller: TextEditingController(
-                                text: _endDate != null
-                                    ? DateFormat('yyyy-MM-dd').format(_endDate!)
-                                    : '',
-                              ),
-                              validator: (value) {
-                                if (!_isCurrent && _endDate == null) {
-                                  return 'Please select end date';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ),
-                      if (!_isCurrent)
-                        const SizedBox(height: 16),
-
-                      // Description
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
-                        ),
-                        maxLines: 5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isSaving
-                      ? null // Disable cancel button while saving
-                      : () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: _isSaving
-                      ? null // Disable save button while saving
-                      : () {
-                    if (_formKey.currentState!.validate()) {
-                      // Set saving state
-                      setState(() {
-                        _isSaving = true;
-                      });
-
-                      // Create updated experience entity
-                      final updatedExperience = Experience(
-                        id: experience.id,
-                        jobTitle: _jobTitleController.text,
-                        company: _companyController.text,
-                        startDate: _startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : '',
-                        endDate: _isCurrent ? null : (_endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : null),
-                        isCurrent: _isCurrent,
-                        description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-                        location: _selectedCountry,
-                      );
-
-                      // Dispatch update event using the stored ResumeBloc instance
-                      resumeBloc.add(UpdateExperience(
-                        experience: updatedExperience,
-                        candidateId: _candidateId,
-                      ));
-
-                      // Note: Don't pop here, let the BlocListener handle it
-                    }
-                  },
-                  child: _isSaving
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text('Save'),
-                ),
-              ],
-            ),
-          ),
-          )
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Experience experience) {
-    bool _isDeleting = false;
-
-    // Get the ResumeBloc instance from the context before showing the dialog
-    //final resumeBloc = context.read<ResumeBloc>();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while deleting
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ExperienceDeleted) {
-                // Close dialog when experience is deleted
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update deleting state
-                setState(() {
-                  _isDeleting = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Delete Experience'),
-                content: Text('Are you sure you want to delete "${experience.jobTitle}" at "${experience.company}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable cancel button while deleting
-                        : () {
-                      Navigator.of(dialogContext).pop();
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable delete button while deleting
-                        : () {
-                      if (experience.id != null) {
-                        // Set deleting state
-                        setState(() {
-                          _isDeleting = true;
-                        });
-
-                        // Dispatch delete event using the stored ResumeBloc instance
-                        resumeBloc.add(DeleteExperience(
-                          experienceId: experience.id!,
-                          candidateId: _candidateId,
-                        ));
-
-                        // Note: Don't pop here, let the BlocListener handle it
-                      }
-                    },
-                    child: _isDeleting
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                        : const Text('Delete'),
-                  ),
-                ],
-              ),
-            ),
-          )
-          );
-      },
     );
   }
 }

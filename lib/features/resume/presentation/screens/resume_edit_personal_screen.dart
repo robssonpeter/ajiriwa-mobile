@@ -17,10 +17,8 @@ class ResumeEditPersonalScreen extends StatefulWidget {
 }
 
 class _ResumeEditPersonalScreenState extends State<ResumeEditPersonalScreen> {
-  // Form key for validation
   final _formKey = GlobalKey<FormState>();
 
-  // Text editing controllers
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -29,26 +27,19 @@ class _ResumeEditPersonalScreenState extends State<ResumeEditPersonalScreen> {
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _headlineController = TextEditingController();
-  //final _summaryController = TextEditingController();
 
-  // Selected values
   String? _selectedCountry;
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
 
-  // Profile completion percentage
   int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // Countries data from API
   Map<String, dynamic> _countries = {};
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Fetch personal information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ResumeBloc>().add(const GetResumeSection(section: 'personal'));
     });
@@ -56,7 +47,6 @@ class _ResumeEditPersonalScreenState extends State<ResumeEditPersonalScreen> {
 
   @override
   void dispose() {
-    // Dispose controllers
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -65,378 +55,331 @@ class _ResumeEditPersonalScreenState extends State<ResumeEditPersonalScreen> {
     _cityController.dispose();
     _postalCodeController.dispose();
     _headlineController.dispose();
-    //_summaryController.dispose();
     super.dispose();
+  }
+
+  void _save() {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isSaving = true);
+      final personal = Personal(
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
+        email: _emailController.text,
+        phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
+        address: _addressController.text.isNotEmpty ? _addressController.text : null,
+        country: _selectedCountry != null ? _selectedCountry!.toLowerCase() : null,
+        postalCode: _postalCodeController.text.isNotEmpty ? _postalCodeController.text : null,
+        gender: _selectedGender,
+        dateOfBirth: _selectedDateOfBirth != null
+            ? '${_selectedDateOfBirth!.year}-${_selectedDateOfBirth!.month.toString().padLeft(2, '0')}-${_selectedDateOfBirth!.day.toString().padLeft(2, '0')}'
+            : null,
+        headline: _headlineController.text.isNotEmpty ? _headlineController.text : null,
+      );
+      context.read<ResumeBloc>().add(UpdatePersonal(personal: personal, candidateId: _candidateId));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Personal Information'),
-        actions: [
-          // Keep the next button
-          TextButton(
-            onPressed: () {
-              // Navigate to next section (career)
-              context.goNamed(AppRouter.resumeEditCareer);
-            },
-            child: const Row(
-              children: [
-                Text('Next', style: TextStyle(color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-              ],
-            ),
-          ),
-          // Add navigation menu (at the far right)
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditPersonal),
-        ],
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate back to profile screen
-            context.goNamed(AppRouter.profile);
-          },
+          onPressed: () => context.goNamed(AppRouter.profile),
         ),
+        actions: [
+          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditPersonal),
+        ],
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
+          setState(() => _isSaving = false);
           if (state is ResumeSectionLoaded) {
-            // Update profile completion and countries data
             setState(() {
               _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
               _countries = state.response.countries ?? {};
             });
-
-            // Get personal information from response
             final personal = state.response.data['personal'] as Map<String, dynamic>?;
             if (personal != null) {
-              // Update text controllers
-              _firstNameController.text = personal['first_name'] != null ? personal['first_name'] as String? ?? '' : '';
-              _lastNameController.text = personal['last_name'] != null ? personal['last_name'] as String? ?? '' : '';
-              _emailController.text = personal['last_name'] != null ? personal['email'] as String? ?? '' : '';
-              _phoneController.text = personal['last_name'] != null ? personal['phone'] as String? ?? '' : '';
-              _addressController.text = personal['address'] != null ? personal['address'] as String? ?? '' : '';
-              _cityController.text = personal['city'] != null ? personal['city'] as String? ?? '' : '';
-              _postalCodeController.text = personal['postalCode'] != null ? personal['postalCode'] as String? ?? '' : '';
-              _headlineController.text = personal['professional_title'] != null ? personal['professional_title'] as String? ?? '' : '';
-              //_summaryController.text = personal['summary'] as String? ?? '';
-
-              // Update selected values
+              _firstNameController.text = personal['first_name'] as String? ?? '';
+              _lastNameController.text = personal['last_name'] as String? ?? '';
+              _emailController.text = personal['email'] as String? ?? '';
+              _phoneController.text = personal['phone'] as String? ?? '';
+              _addressController.text = personal['address'] as String? ?? '';
+              _cityController.text = personal['city'] as String? ?? '';
+              _postalCodeController.text = personal['postalCode'] as String? ?? '';
+              _headlineController.text = personal['professional_title'] as String? ?? '';
               setState(() {
-                // Convert country code to uppercase if it exists and not empty
                 final countryCode = personal['country'] as String?;
                 _selectedCountry = (countryCode != null && countryCode.isNotEmpty) ? countryCode.toUpperCase() : null;
-
                 final gender = personal['gender'];
-                _selectedGender = gender != null ? (gender == 1 ? "male" : "female") : null;
+                _selectedGender = gender != null ? (gender == 1 ? 'male' : 'female') : null;
                 final dob = personal['dob'] as String?;
                 _selectedDateOfBirth = dob != null ? DateTime.tryParse(dob) : null;
               });
             }
           } else if (state is PersonalUpdated) {
-            // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Personal information updated successfully'),
-                duration: Duration(seconds: 2),
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text('Personal information saved!'),
+                  ],
+                ),
+                backgroundColor: primary,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                duration: const Duration(seconds: 2),
               ),
             );
-
-            // Navigate to next section
             context.goNamed(AppRouter.resumeEditCareer);
           } else if (state is ResumeError) {
-            // Show error message
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
+                backgroundColor: Colors.red.shade600,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             );
           }
         },
         builder: (context, state) {
-          // Show loading indicator while fetching data
-          if (state is ResumeLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+          if (state is ResumeLoading && _firstNameController.text.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile completion indicator
-                  LinearProgressIndicator(value: _profileCompletion / 100),
-                  const SizedBox(height: 8),
-                  Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 24),
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditPersonal),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      // Profile completion banner
+                      if (_profileCompletion > 0)
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: primary.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.insights, color: primary, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Profile $_profileCompletion% complete',
+                                style: TextStyle(color: primary, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
 
-                  // Personal information form
-                  const Text(
-                    'Personal Information',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
+                      const ResumeSectionHeader(
+                        title: 'Personal Information',
+                        icon: Icons.person_outline,
+                        subtitle: 'Your basic contact and identity details',
+                      ),
 
-                  // First name
-                  TextFormField(
-                    controller: _firstNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'First Name *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your first name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Last name
-                  TextFormField(
-                    controller: _lastNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Last Name *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your last name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Email
-                  /*TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email *',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@') || !value.contains('.')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),*/
-
-                  // Phone
-                  TextFormField(
-                    controller: _phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Address
-                  TextFormField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Address',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // City
-                  /*TextFormField(
-                    controller: _cityController,
-                    decoration: const InputDecoration(
-                      labelText: 'City',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),*/
-
-                  // Country
-                  DropdownButtonFormField<String>(
-                    value: _countries.isEmpty || _selectedCountry == null ? null : (_countries.keys.any((k) => k.toUpperCase() == _selectedCountry) ? _selectedCountry : null),
-                    decoration: const InputDecoration(
-                      labelText: 'Country',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _countries.isEmpty 
-                      ? [] 
-                      : _countries.entries.map((entry) {
-                          final countryCode = entry.key;
-                          final countryData = entry.value as Map<String, dynamic>?;
-                          if (countryData == null) {
-                            return DropdownMenuItem<String>(
-                              value: countryCode.toUpperCase(),
-                              child: Text(countryCode.toUpperCase()),
-                            );
-                          }
-                          final countryName = countryData['name'] as String? ?? 'Unknown';
-                          final countryEmoji = countryData['emoji'] as String?;
-
-                          return DropdownMenuItem<String>(
-                            value: countryCode.toUpperCase(),
-                            child: Row(
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                if (countryEmoji != null) Text(countryEmoji + ' '),
-                                Text(countryName),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _firstNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'First Name *',
+                                      prefixIcon: Icon(Icons.badge_outlined),
+                                    ),
+                                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                    textCapitalization: TextCapitalization.words,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _lastNameController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Last Name *',
+                                    ),
+                                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                    textCapitalization: TextCapitalization.words,
+                                  ),
+                                ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCountry = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _headlineController,
+                              decoration: const InputDecoration(
+                                labelText: 'Professional Title / Headline',
+                                prefixIcon: Icon(Icons.work_outline),
+                                hintText: 'e.g. Senior Software Engineer',
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _phoneController,
+                              decoration: const InputDecoration(
+                                labelText: 'Phone Number',
+                                prefixIcon: Icon(Icons.phone_outlined),
+                              ),
+                              keyboardType: TextInputType.phone,
+                            ),
+                          ],
+                        ),
+                      ),
 
-                  // Postal code
-                  /*TextFormField(
-                    controller: _postalCodeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Postal Code',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),*/
+                      const ResumeSectionHeader(
+                        title: 'Location',
+                        icon: Icons.location_on_outlined,
+                        subtitle: 'Where are you based?',
+                      ),
 
-                  // Gender
-                  DropdownButtonFormField<String>(
-                    value: _selectedGender == null ? null : 
-                           (const ['male', 'female', 'other', 'prefer_not_to_say'].contains(_selectedGender) ? _selectedGender : null),
-                    decoration: const InputDecoration(
-                      labelText: 'Gender',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'male', child: Text('Male')),
-                      DropdownMenuItem(value: 'female', child: Text('Female')),
-                      DropdownMenuItem(value: 'other', child: Text('Other')),
-                      DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _addressController,
+                              decoration: const InputDecoration(
+                                labelText: 'Address',
+                                prefixIcon: Icon(Icons.home_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            DropdownButtonFormField<String>(
+                              value: _countries.isEmpty || _selectedCountry == null
+                                  ? null
+                                  : (_countries.keys.any((k) => k.toUpperCase() == _selectedCountry)
+                                      ? _selectedCountry
+                                      : null),
+                              decoration: const InputDecoration(
+                                labelText: 'Country',
+                                prefixIcon: Icon(Icons.flag_outlined),
+                              ),
+                              isExpanded: true,
+                              items: _countries.isEmpty
+                                  ? []
+                                  : _countries.entries.map((entry) {
+                                      final code = entry.key;
+                                      final data = entry.value as Map<String, dynamic>?;
+                                      final name = data?['name'] as String? ?? code.toUpperCase();
+                                      final emoji = data?['emoji'] as String?;
+                                      return DropdownMenuItem<String>(
+                                        value: code.toUpperCase(),
+                                        child: Text(emoji != null ? '$emoji  $name' : name),
+                                      );
+                                    }).toList(),
+                              onChanged: (v) => setState(() => _selectedCountry = v),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const ResumeSectionHeader(
+                        title: 'Personal Details',
+                        icon: Icons.person_pin_outlined,
+                        subtitle: 'Optional demographic information',
+                      ),
+
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<String>(
+                              value: _selectedGender == null
+                                  ? null
+                                  : (const ['male', 'female', 'other', 'prefer_not_to_say'].contains(_selectedGender)
+                                      ? _selectedGender
+                                      : null),
+                              decoration: const InputDecoration(
+                                labelText: 'Gender',
+                                prefixIcon: Icon(Icons.wc_outlined),
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'male', child: Text('Male')),
+                                DropdownMenuItem(value: 'female', child: Text('Female')),
+                                DropdownMenuItem(value: 'other', child: Text('Other')),
+                                DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                              ],
+                              onChanged: (v) => setState(() => _selectedGender = v),
+                            ),
+                            const SizedBox(height: 14),
+                            GestureDetector(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDateOfBirth ?? DateTime(1990),
+                                  firstDate: DateTime(1900),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (date != null) setState(() => _selectedDateOfBirth = date);
+                              },
+                              child: AbsorbPointer(
+                                child: TextFormField(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Date of Birth',
+                                    prefixIcon: Icon(Icons.cake_outlined),
+                                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                                  ),
+                                  controller: TextEditingController(
+                                    text: _selectedDateOfBirth != null
+                                        ? '${_selectedDateOfBirth!.day}/${_selectedDateOfBirth!.month}/${_selectedDateOfBirth!.year}'
+                                        : '',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Save button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _save,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: Text(_isSaving ? 'Saving...' : 'Save & Continue'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+
+                      ResumeNavButtons(
+                        nextRoute: AppRouter.resumeEditCareer,
+                      ),
+
+                      const SizedBox(height: 16),
                     ],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGender = value;
-                      });
-                    },
                   ),
-                  const SizedBox(height: 16),
-
-                  // Date of birth
-                  GestureDetector(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDateOfBirth ?? DateTime.now(),
-                        firstDate: DateTime(1900),
-                        lastDate: DateTime.now(),
-                      );
-                      if (date != null) {
-                        setState(() {
-                          _selectedDateOfBirth = date;
-                        });
-                      }
-                    },
-                    child: AbsorbPointer(
-                      child: TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Date of Birth',
-                          border: OutlineInputBorder(),
-                          suffixIcon: Icon(Icons.calendar_today),
-                        ),
-                        controller: TextEditingController(
-                          text: _selectedDateOfBirth != null
-                              ? '${_selectedDateOfBirth!.day}/${_selectedDateOfBirth!.month}/${_selectedDateOfBirth!.year}'
-                              : '',
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Headline
-                  TextFormField(
-                    controller: _headlineController,
-                    decoration: const InputDecoration(
-                      labelText: 'Headline/Title',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Summary
-                  /*TextFormField(
-                    controller: _summaryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Summary',
-                      border: OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                    ),
-                    maxLines: 5,
-                  ),
-                  const SizedBox(height: 32),*/
-
-                  // Save button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Validate form
-                        if (_formKey.currentState!.validate()) {
-                          // Create personal entity
-                          final personal = Personal(
-                            firstName: _firstNameController.text,
-                            lastName: _lastNameController.text,
-                            email: _emailController.text,
-                            phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
-                            address: _addressController.text.isNotEmpty ? _addressController.text : null,
-                            //city: _cityController.text.isNotEmpty ? _cityController.text : null,
-                            // Convert country code to lowercase if it exists
-                            country: _selectedCountry != null ? _selectedCountry!.toLowerCase() : null,
-                            postalCode: _postalCodeController.text.isNotEmpty ? _postalCodeController.text : null,
-                            gender: _selectedGender /*== "male" ? 1 : 2*/,
-                            dateOfBirth: _selectedDateOfBirth != null
-                                ? '${_selectedDateOfBirth!.year}-${_selectedDateOfBirth!.month.toString().padLeft(2, '0')}-${_selectedDateOfBirth!.day.toString().padLeft(2, '0')}'
-                                : null,
-                            headline: _headlineController.text.isNotEmpty ? _headlineController.text : null,
-                            //summary: _summaryController.text.isNotEmpty ? _summaryController.text : null,
-                          );
-
-                          // Dispatch update event
-                          context.read<ResumeBloc>().add(UpdatePersonal(
-                            personal: personal,
-                            candidateId: _candidateId,
-                          ));
-                        }
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12.0),
-                        child: Text('Save & Continue'),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           );
         },
       ),

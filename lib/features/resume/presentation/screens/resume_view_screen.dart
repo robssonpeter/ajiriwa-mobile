@@ -302,13 +302,21 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
     _loadResumeUrl(templateKey: _currentTemplateKey);
   }
 
+  static const String _baseUrl = 'https://www.ajiriwa.net';
+
   void _setDefaultTemplates() {
     setState(() {
       _templates = [
-        {'key': 'material', 'name': 'Material', 'thumbnail': '', 'owned': true},
-        {'key': 'stockholm', 'name': 'Stockholm', 'thumbnail': '', 'owned': true},
-        {'key': 'stylish', 'name': 'Stylish', 'thumbnail': '', 'owned': true},
-        {'key': 'toronto', 'name': 'Toronto', 'thumbnail': '', 'owned': true},
+        {'key': 'material',   'name': 'Material',   'thumbnail': '$_baseUrl/storage/thumbnails/material.webp',   'owned': true},
+        {'key': 'stockholm',  'name': 'Stockholm',  'thumbnail': '$_baseUrl/storage/thumbnails/stockholm.webp',  'owned': true},
+        {'key': 'stylish',    'name': 'Stylish',    'thumbnail': '$_baseUrl/storage/thumbnails/stylish.webp',    'owned': true},
+        {'key': 'toronto',    'name': 'Toronto',    'thumbnail': '$_baseUrl/storage/thumbnails/toronto.webp',    'owned': true},
+        {'key': 'executive',  'name': 'Executive',  'thumbnail': '$_baseUrl/storage/thumbnails/executive.webp',  'owned': true},
+        {'key': 'modern',     'name': 'Modern',     'thumbnail': '$_baseUrl/storage/thumbnails/modern.webp',     'owned': true},
+        {'key': 'minimalist', 'name': 'Minimalist', 'thumbnail': '$_baseUrl/storage/thumbnails/minimalist.webp', 'owned': true},
+        {'key': 'elegant',    'name': 'Elegant',    'thumbnail': '$_baseUrl/storage/thumbnails/elegant.webp',    'owned': true},
+        {'key': 'nordic',     'name': 'Nordic',     'thumbnail': '$_baseUrl/storage/thumbnails/nordic.webp',     'owned': true},
+        {'key': 'atelier',    'name': 'Atelier',    'thumbnail': '$_baseUrl/storage/thumbnails/atelier.webp',    'owned': true},
       ];
     });
   }
@@ -328,20 +336,25 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
           final rawData = state.resumeData as dynamic;
           if (rawData is Map && rawData.containsKey('templates')) {
             final templatesData = rawData['templates'] as List<dynamic>;
-            setState(() {
-              _templates = templatesData.map<Map<String, dynamic>>((template) {
-                return {
-                  'key': template['slug'] as String,
-                  'name': template['name'] as String,
-                  'thumbnail': template['thumbnail'] as String? ?? '',
-                  'price': template['price'],
-                  'currency': template['currency'],
-                  'owned': template['owned'] as bool,
-                };
-              }).toList();
-            });
-
-            if (_templates.isEmpty) {
+            if (templatesData.isNotEmpty) {
+              setState(() {
+                _templates = templatesData.map<Map<String, dynamic>>((template) {
+                  // Resolve thumbnail: prefix relative paths with base URL
+                  String thumb = template['thumbnail'] as String? ?? '';
+                  if (thumb.isNotEmpty && !thumb.startsWith('http')) {
+                    thumb = '$_baseUrl/storage/$thumb';
+                  }
+                  return {
+                    'key': template['slug'] as String,
+                    'name': template['name'] as String,
+                    'thumbnail': thumb,
+                    'price': template['price'],
+                    'currency': template['currency'],
+                    'owned': template['owned'] as bool? ?? true,
+                  };
+                }).toList();
+              });
+            } else {
               _setDefaultTemplates();
             }
           } else {
@@ -475,108 +488,195 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
   }
 
   void _showThemeSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select CV Theme'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: GridView.builder(
-              shrinkWrap: true,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _templates.length,
-              itemBuilder: (context, index) {
-                final template = _templates[index];
-                final isSelected = template['key'] == _currentTemplateKey;
+    final primary = Theme.of(context).colorScheme.primary;
 
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _loadResumeUrl(templateKey: template['key']);
-                  },
-                  child: Card(
-                    elevation: isSelected ? 4 : 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-                        width: 2,
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.color_lens_outlined, color: primary, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Choose CV Theme',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: primary,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                            child: Container(
-                              color: Colors.grey[200],
-                              child: template['thumbnail'] != null && template['thumbnail'].toString().isNotEmpty
-                                  ? Image.network(
-                                template['thumbnail'].toString(),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Center(
-                                    child: Icon(
-                                      Icons.description,
-                                      size: 48,
-                                      color: Colors.grey[400],
-                                    ),
-                                  );
-                                },
-                              )
-                                  : Center(
-                                child: Icon(
-                                  Icons.description,
-                                  size: 48,
-                                  color: Colors.grey[400],
+                    const Spacer(),
+                    Text(
+                      '${_templates.length} themes',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.55,
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.68,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: _templates.length,
+                  itemBuilder: (ctx2, index) {
+                    final template = _templates[index];
+                    final isSelected = template['key'] == _currentTemplateKey;
+                    final thumbUrl = template['thumbnail']?.toString() ?? '';
+                    final isOwned = template['owned'] as bool? ?? true;
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _loadResumeUrl(templateKey: template['key'] as String);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: isSelected ? primary.withOpacity(0.05) : Theme.of(ctx2).cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? primary : Colors.grey.shade200,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isSelected ? 0.08 : 0.04),
+                              blurRadius: isSelected ? 10 : 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    // Thumbnail image
+                                    thumbUrl.isNotEmpty
+                                        ? Image.network(
+                                            thumbUrl,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (ctx3, child, progress) {
+                                              if (progress == null) return child;
+                                              return Container(
+                                                color: Colors.grey.shade100,
+                                                child: Center(
+                                                  child: CircularProgressIndicator(
+                                                    value: progress.expectedTotalBytes != null
+                                                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                                        : null,
+                                                    strokeWidth: 2,
+                                                    color: primary,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (_, __, ___) => _buildThumbPlaceholder(primary),
+                                          )
+                                        : _buildThumbPlaceholder(primary),
+                                    // Lock overlay for unowned templates
+                                    if (!isOwned)
+                                      Container(
+                                        color: Colors.black.withOpacity(0.35),
+                                        child: const Center(
+                                          child: Icon(Icons.lock_outline, color: Colors.white, size: 28),
+                                        ),
+                                      ),
+                                    // Selected checkmark
+                                    if (isSelected)
+                                      Positioned(
+                                        top: 8, right: 8,
+                                        child: Container(
+                                          width: 24, height: 24,
+                                          decoration: BoxDecoration(
+                                            color: primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.check, color: Colors.white, size: 14),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            template['name'],
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      template['name'] as String? ?? '',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected ? primary : null,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (!isOwned)
+                                    Icon(Icons.lock_outline, size: 12, color: Colors.grey.shade400),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        if (isSelected)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Icon(
-                              Icons.check_circle,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 16,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
         );
       },
+    );
+  }
+
+  Widget _buildThumbPlaceholder(Color primary) {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.description_outlined, size: 36, color: primary.withOpacity(0.3)),
+          const SizedBox(height: 4),
+          Text('Preview', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+        ],
+      ),
     );
   }
 

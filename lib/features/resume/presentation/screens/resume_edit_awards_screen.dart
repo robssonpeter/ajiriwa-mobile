@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../core/navigation/app_router.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
 
-/// Resume edit awards screen - for editing awards and certificates
+/// Resume edit awards / certifications screen
 class ResumeEditAwardsScreen extends StatefulWidget {
-  /// Constructor
   const ResumeEditAwardsScreen({Key? key}) : super(key: key);
 
   @override
@@ -18,133 +16,292 @@ class ResumeEditAwardsScreen extends StatefulWidget {
 }
 
 class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
-  // Profile completion percentage
-  int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // List of awards
   List<Award> _awards = [];
-
-  // Map of countries
   Map<String, dynamic> _countries = {};
-
-  // List of industries
   List<dynamic> _industries = [];
-
-  // Resume bloc instance
   late ResumeBloc resumeBloc;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the resumeBloc
     resumeBloc = context.read<ResumeBloc>();
-    // Fetch awards information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      resumeBloc.add(const GetResumeSection(section: 'certificates'));
+      resumeBloc.add(const GetResumeSection(section: 'awards'));
     });
+  }
+
+  void _showAwardSheet(BuildContext context, {Award? existing}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final issuerCtrl = TextEditingController(text: existing?.issuer ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
+    DateTime? awardDate = existing?.date != null && existing!.date.isNotEmpty
+        ? DateTime.tryParse(existing.date)
+        : null;
+    String? selectedCountry = existing?.countryId?.toUpperCase();
+    int? selectedIndustryId = existing?.industryId;
+    bool isSaving = false;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: resumeBloc,
+        child: BlocListener<ResumeBloc, ResumeState>(
+          listener: (_, state) {
+            if (state is AwardAdded || state is AwardUpdated) Navigator.of(ctx).pop();
+          },
+          child: StatefulBuilder(
+            builder: (ctx3, setSheetState) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx3).viewInsets.bottom),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx3).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 4),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.workspace_premium_outlined, color: primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            existing == null ? 'Add Certification / Award' : 'Edit Certification / Award',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                controller: nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Award / Certification Name *',
+                                  prefixIcon: Icon(Icons.workspace_premium_outlined),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: issuerCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Issuing Organisation *',
+                                  prefixIcon: Icon(Icons.business_outlined),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              // Date
+                              GestureDetector(
+                                onTap: () async {
+                                  final d = await showDatePicker(
+                                    context: ctx3,
+                                    initialDate: awardDate ?? DateTime.now(),
+                                    firstDate: DateTime(1900),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (d != null) setSheetState(() => awardDate = d);
+                                },
+                                child: AbsorbPointer(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Date Issued',
+                                      prefixIcon: Icon(Icons.calendar_today_outlined),
+                                      suffixIcon: Icon(Icons.calendar_today_outlined),
+                                    ),
+                                    controller: TextEditingController(
+                                      text: awardDate != null
+                                          ? '${awardDate!.day}/${awardDate!.month}/${awardDate!.year}'
+                                          : '',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_countries.isNotEmpty)
+                                DropdownButtonFormField<String>(
+                                  value: selectedCountry == null
+                                      ? null
+                                      : (_countries.keys.any((k) => k.toUpperCase() == selectedCountry) ? selectedCountry : null),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Country',
+                                    prefixIcon: Icon(Icons.flag_outlined),
+                                  ),
+                                  isExpanded: true,
+                                  items: _countries.entries.map((e) {
+                                    final data = e.value as Map<String, dynamic>?;
+                                    final name = data?['name'] as String? ?? e.key.toUpperCase();
+                                    final emoji = data?['emoji'] as String?;
+                                    return DropdownMenuItem<String>(
+                                      value: e.key.toUpperCase(),
+                                      child: Text(emoji != null ? '$emoji  $name' : name, overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setSheetState(() => selectedCountry = v),
+                                ),
+                              if (_countries.isNotEmpty) const SizedBox(height: 12),
+                              if (_industries.isNotEmpty)
+                                DropdownButtonFormField<int>(
+                                  value: selectedIndustryId,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Industry',
+                                    prefixIcon: Icon(Icons.category_outlined),
+                                  ),
+                                  isExpanded: true,
+                                  items: _industries.map((ind) {
+                                    final m = ind as Map<String, dynamic>;
+                                    return DropdownMenuItem<int>(
+                                      value: m['id'] as int?,
+                                      child: Text(m['name'] as String? ?? '', overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setSheetState(() => selectedIndustryId = v),
+                                ),
+                              if (_industries.isNotEmpty) const SizedBox(height: 12),
+                              TextFormField(
+                                controller: descCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Description (optional)',
+                                  prefixIcon: Icon(Icons.notes_outlined),
+                                  alignLabelWithHint: true,
+                                ),
+                                maxLines: 3,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: isSaving
+                                    ? null
+                                    : () {
+                                        if (formKey.currentState!.validate()) {
+                                          setSheetState(() => isSaving = true);
+                                          final award = Award(
+                                            id: existing?.id,
+                                            name: nameCtrl.text,
+                                            issuer: issuerCtrl.text,
+                                            date: awardDate != null
+                                                ? '${awardDate!.year}-${awardDate!.month.toString().padLeft(2, '0')}-${awardDate!.day.toString().padLeft(2, '0')}'
+                                                : '',
+                                            description: descCtrl.text.isNotEmpty ? descCtrl.text : null,
+                                            countryId: selectedCountry?.toLowerCase(),
+                                            industryId: selectedIndustryId,
+                                          );
+                                          if (existing == null) {
+                                            resumeBloc.add(AddAward(award: award, candidateId: _candidateId));
+                                          } else {
+                                            resumeBloc.add(UpdateAward(award: award, candidateId: _candidateId));
+                                          }
+                                        }
+                                      },
+                                icon: isSaving
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Icon(Icons.save_outlined),
+                                label: Text(isSaving ? 'Saving...' : 'Save'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Award award) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Award'),
+        content: Text('Remove "${award.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              resumeBloc.add(DeleteAward(awardId: award.id!, candidateId: _candidateId));
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Awards & Certificates'),
-        actions: [
-          // Keep the next button
-          TextButton(
-            onPressed: () {
-              // Navigate to next section (reference)
-              context.goNamed(AppRouter.resumeEditReference);
-            },
-            child: const Row(
-              children: [
-                Text('Next', style: TextStyle(color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-              ],
-            ),
-          ),
-          // Add navigation menu (at the far right)
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditAwards),
-        ],
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate to previous section (skills)
-            context.goNamed(AppRouter.resumeEditSkills);
-          },
+          onPressed: () => context.goNamed(AppRouter.resumeEditLanguage),
         ),
+        actions: [ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditAwards)],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAwardSheet(context),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Certification'),
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
           if (state is ResumeSectionLoaded) {
-            // Update profile completion, candidate ID, countries, industries
             setState(() {
-              _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
               _countries = state.response.countries ?? {};
               _industries = state.response.industries ?? [];
-
-              // Get awards list from response
-              final awardsList = state.response.data['awards'] as List<dynamic>?;
-              if (awardsList != null) {
-                _awards = awardsList.map((e) {
-                  final award = e as Map<String, dynamic>;
-
-                  // Get the country value from the response
-                  final countryValue = award['country_id'] as String?;
-                  // Find the country code for the given country value
-                  String? countryCode;
-                  String? countryName;
-                  if (countryValue != null) {
-                    // First check if the country value is already a valid country code
-                    if (_countries.containsKey(countryValue.toLowerCase())) {
-                      countryCode = countryValue.toLowerCase();
-                      final countryData = _countries[countryCode] as Map<String, dynamic>?;
-                      if (countryData != null) {
-                        countryName = countryData['name'] as String?;
-                      }
-                    } else {
-                      // If not, try to find the country code by name
-                      for (final entry in _countries.entries) {
-                        final countryData = entry.value as Map<String, dynamic>?;
-                        if (countryData != null && 
-                            (countryData['name'] as String?) == countryValue) {
-                          countryCode = entry.key;
-                          countryName = countryValue;
-                          break;
-                        }
-                      }
-                    }
-                  }
-
-                  // Get the industry value from the response
-                  final industryId = award['industry_id'] as int?;
-                  String? industryName;
-                  if (industryId != null) {
-                    // Find the industry name for the given industry ID
-                    final industry = _industries.firstWhere(
-                      (industry) => industry['id'] == industryId,
-                      orElse: () => {'name': ''},
-                    );
-                    industryName = industry['name'] as String?;
-                  }
-
+              final list = state.response.data['awards'] as List<dynamic>?;
+              if (list != null) {
+                _awards = list.map((e) {
+                  final m = e as Map<String, dynamic>;
                   return Award(
-                    id: award['id'] as int?,
-                    name: award['name'] as String? ?? '',
-                    issuer: award['issuer'] as String? ?? '',
-                    date: award['date'] as String? ?? '',
-                    description: award['description'] as String?,
-                    categoryId: award['category_id'] as int?,
-                    category: award['category'] as String?,
-                    countryId: countryCode,
-                    country: countryName,
-                    industryId: industryId,
-                    industry: industryName,
+                    id: m['id'] as int?,
+                    name: m['name'] as String? ?? '',
+                    issuer: m['issuer'] as String? ?? '',
+                    date: m['date'] as String? ?? '',
+                    description: m['description'] as String?,
+                    countryId: m['country_id'] as String?,
+                    country: m['country'] as String?,
+                    industryId: m['industry_id'] as int?,
+                    industry: m['industry'] as String?,
                   );
                 }).toList();
               } else {
@@ -152,941 +309,162 @@ class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
               }
             });
           } else if (state is AwardAdded) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Award added successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the awards list
-            resumeBloc.add(const GetResumeSection(section: 'certificates'));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Certification added!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
+            resumeBloc.add(const GetResumeSection(section: 'awards'));
           } else if (state is AwardUpdated) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Award updated successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the awards list
-            resumeBloc.add(const GetResumeSection(section: 'certificates'));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Certification updated!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
+            resumeBloc.add(const GetResumeSection(section: 'awards'));
           } else if (state is AwardDeleted) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Award deleted successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the awards list
-            resumeBloc.add(const GetResumeSection(section: 'certificates'));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Certification removed!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
+            resumeBloc.add(const GetResumeSection(section: 'awards'));
           } else if (state is ResumeError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(state.message), backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
           }
         },
         builder: (context, state) {
-          // Show loading indicator only when initially loading the section
-          // Not when adding, updating, or deleting awards
           if (state is ResumeLoading && _awards.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile completion indicator
-                LinearProgressIndicator(value: _profileCompletion / 100),
-                const SizedBox(height: 8),
-                Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-
-                // Awards list
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditAwards),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    const Text(
-                      'Awards & Certificates',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const ResumeSectionHeader(
+                      title: 'Certifications & Awards',
+                      icon: Icons.workspace_premium_outlined,
+                      subtitle: 'Professional certifications, awards and achievements',
                     ),
-                    SizedBox(
-                      width: 100, // Fixed width to avoid infinite constraints
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Show add award dialog/screen
-                          _showAddAwardDialog(context);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+
+                    if (_awards.isEmpty)
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Icon(Icons.workspace_premium_outlined, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text('No certifications added yet',
+                                style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text('Add your professional certifications and awards',
+                                style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () => _showAwardSheet(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Certification'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary, side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                      )
+                    else
+                      ..._awards.map((award) {
+                        String dateStr = '';
+                        try {
+                          if (award.date.isNotEmpty) {
+                            final d = DateTime.parse(award.date);
+                            dateStr = '${d.day}/${d.month}/${d.year}';
+                          }
+                        } catch (_) {
+                          dateStr = award.date;
+                        }
 
-                // Awards list
-                if (_awards.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'No awards or certificates added yet. Click the "Add" button to add your awards and certificates.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _awards.length,
-                    itemBuilder: (context, index) {
-                      final award = _awards[index];
-
-                      // Format date
-                      String formattedDate = award.date;
-                      try {
-                        final date = DateTime.parse(award.date);
-                        formattedDate = DateFormat.yMMMd().format(date);
-                      } catch (e) {
-                        // If date parsing fails, use the original date string
-                      }
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      award.name,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44, height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  Row(
+                                  child: const Icon(Icons.workspace_premium_outlined, color: Color(0xFFF59E0B), size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () {
-                                          _showEditAwardDialog(context, award);
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () {
-                                          _showDeleteConfirmationDialog(context, award);
-                                        },
-                                      ),
+                                      Text(award.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      Text(award.issuer, style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                                      if (dateStr.isNotEmpty)
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today_outlined, size: 12, color: Colors.grey.shade400),
+                                            const SizedBox(width: 4),
+                                            Text(dateStr, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                                          ],
+                                        ),
+                                      if (award.industry != null && award.industry!.isNotEmpty)
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: primary.withOpacity(0.08),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(award.industry!, style: TextStyle(color: primary, fontSize: 11)),
+                                        ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                award.issuer,
-                                style: const TextStyle(
-                                  fontSize: 16,
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Received: $formattedDate',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              if (award.category != null && award.category!.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Category: ${award.category}',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
+                                PopupMenuButton<String>(
+                                  onSelected: (v) {
+                                    if (v == 'edit') _showAwardSheet(context, existing: award);
+                                    if (v == 'delete') _confirmDelete(context, award);
+                                  },
+                                  itemBuilder: (_) => [
+                                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+                                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                                  ],
                                 ),
                               ],
-                              if (award.country != null && award.country!.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Country: ${award.country}',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                              if (award.industry != null && award.industry!.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Industry: ${award.industry}',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                              if (award.description != null && award.description!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                const Divider(),
-                                const SizedBox(height: 8),
-                                Text(
-                                  award.description!,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      }).toList(),
 
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Go back to previous section
-                          context.goNamed(AppRouter.resumeEditSkills);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Previous'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Save and navigate to next section
-                          context.goNamed(AppRouter.resumeEditReference);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Save & Continue'),
-                        ),
-                      ),
+                    ResumeNavButtons(
+                      prevRoute: AppRouter.resumeEditLanguage,
+                      nextRoute: AppRouter.resumeEditReference,
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
-    );
-  }
-
-  void _showAddAwardDialog(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    final _issuerController = TextEditingController();
-    final _dateController = TextEditingController();
-    final _descriptionController = TextEditingController();
-    String? _selectedCountry;
-    int? _selectedIndustryId;
-    int? _selectedCategoryId;
-    bool _isSaving = false;
-
-    // Define categories
-    final categories = [
-      {'id': 1, 'name': 'Academic'},
-      {'id': 2, 'name': 'Professional'},
-      {'id': 3, 'name': 'Technical'},
-      {'id': 4, 'name': 'Leadership'},
-      {'id': 5, 'name': 'Community Service'},
-    ];
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is AwardAdded) {
-                // Close dialog when award is added
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Add Award/Certificate'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Award Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Award/Certificate Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter award/certificate name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Issuer
-                        TextFormField(
-                          controller: _issuerController,
-                          decoration: const InputDecoration(
-                            labelText: 'Issuing Organization *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter issuing organization';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Date
-                        TextFormField(
-                          controller: _dateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Date Received *',
-                            border: OutlineInputBorder(),
-                            hintText: 'YYYY-MM-DD',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter date received';
-                            }
-                            // Simple date validation
-                            final dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                            if (!dateRegex.hasMatch(value)) {
-                              return 'Please enter date in format YYYY-MM-DD';
-                            }
-                            return null;
-                          },
-                          onTap: () async {
-                            // Show date picker
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime(1900),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              _dateController.text = DateFormat('yyyy-MM-dd').format(date);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Category
-                        DropdownButtonFormField<int>(
-                          value: _selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: categories.map((category) {
-                            return DropdownMenuItem<int>(
-                              value: category['id'] as int,
-                              child: Text(category['name'] as String),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCategoryId = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Country
-                        DropdownButtonFormField<String>(
-                          value: _selectedCountry,
-                          decoration: const InputDecoration(
-                            labelText: 'Country',
-                            border: OutlineInputBorder(),
-                          ),
-                          isExpanded: true, // Ensure dropdown uses full width available
-                          items: _countries.isEmpty
-                              ? []
-                              : _countries.entries.map((entry) {
-                            final countryCode = entry.key;
-                            final countryData = entry.value as Map<String, dynamic>?;
-                            if (countryData == null) {
-                              return DropdownMenuItem<String>(
-                                value: countryCode.toLowerCase(),
-                                child: Text(countryCode.toUpperCase()),
-                              );
-                            }
-                            final countryName = countryData['name'] as String? ?? 'Unknown';
-                            final countryEmoji = countryData['emoji'] as String?;
-
-                            return DropdownMenuItem<String>(
-                              value: countryCode.toLowerCase(),
-                              child: Row(
-                                children: [
-                                  if (countryEmoji != null) Text(countryEmoji + ' '),
-                                  Flexible(
-                                    child: Text(
-                                      countryName,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCountry = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Industry
-                        DropdownButtonFormField<int>(
-                          value: _selectedIndustryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Industry',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: _industries.isEmpty
-                              ? []
-                              : _industries.map((industry) {
-                            return DropdownMenuItem<int>(
-                              value: industry['id'] as int,
-                              child: Text(industry['name'] as String),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedIndustryId = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Description
-                        TextFormField(
-                          controller: _descriptionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Description',
-                            border: OutlineInputBorder(),
-                            alignLabelWithHint: true,
-                          ),
-                          maxLines: 5,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Get category name from selected category ID
-                              String? categoryName;
-                              if (_selectedCategoryId != null) {
-                                final category = categories.firstWhere(
-                                  (category) => category['id'] == _selectedCategoryId,
-                                  orElse: () => {'name': ''},
-                                );
-                                categoryName = category['name'] as String?;
-                              }
-
-                              // Get country name from selected country ID
-                              String? countryName;
-                              if (_selectedCountry != null) {
-                                final countryData = _countries[_selectedCountry] as Map<String, dynamic>?;
-                                if (countryData != null) {
-                                  countryName = countryData['name'] as String?;
-                                }
-                              }
-
-                              // Get industry name from selected industry ID
-                              String? industryName;
-                              if (_selectedIndustryId != null) {
-                                final industry = _industries.firstWhere(
-                                  (industry) => industry['id'] == _selectedIndustryId,
-                                  orElse: () => {'name': ''},
-                                );
-                                industryName = industry['name'] as String?;
-                              }
-
-                              // Create award entity
-                              final award = Award(
-                                name: _nameController.text,
-                                issuer: _issuerController.text,
-                                date: _dateController.text,
-                                description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-                                categoryId: _selectedCategoryId,
-                                category: categoryName,
-                                countryId: _selectedCountry,
-                                country: countryName,
-                                industryId: _selectedIndustryId,
-                                industry: industryName,
-                              );
-
-                              // Dispatch add event using the stored ResumeBloc instance
-                              resumeBloc.add(AddAward(
-                                award: award,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEditAwardDialog(BuildContext context, Award award) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController(text: award.name);
-    final _issuerController = TextEditingController(text: award.issuer);
-    final _dateController = TextEditingController(text: award.date);
-    final _descriptionController = TextEditingController(text: award.description ?? '');
-    String? _selectedCountry = award.countryId;
-    int? _selectedIndustryId = award.industryId;
-    int? _selectedCategoryId = award.categoryId;
-    bool _isSaving = false;
-
-    // Define categories
-    final categories = [
-      {'id': 1, 'name': 'Academic'},
-      {'id': 2, 'name': 'Professional'},
-      {'id': 3, 'name': 'Technical'},
-      {'id': 4, 'name': 'Leadership'},
-      {'id': 5, 'name': 'Community Service'},
-    ];
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is AwardUpdated) {
-                // Close dialog when award is updated
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Edit Award/Certificate'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Award Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Award/Certificate Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter award/certificate name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Issuer
-                        TextFormField(
-                          controller: _issuerController,
-                          decoration: const InputDecoration(
-                            labelText: 'Issuing Organization *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter issuing organization';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Date
-                        TextFormField(
-                          controller: _dateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Date Received *',
-                            border: OutlineInputBorder(),
-                            hintText: 'YYYY-MM-DD',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter date received';
-                            }
-                            // Simple date validation
-                            final dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                            if (!dateRegex.hasMatch(value)) {
-                              return 'Please enter date in format YYYY-MM-DD';
-                            }
-                            return null;
-                          },
-                          onTap: () async {
-                            // Show date picker
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.tryParse(award.date) ?? DateTime.now(),
-                              firstDate: DateTime(1900),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              _dateController.text = DateFormat('yyyy-MM-dd').format(date);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Category
-                        DropdownButtonFormField<int>(
-                          value: _selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: categories.map((category) {
-                            return DropdownMenuItem<int>(
-                              value: category['id'] as int,
-                              child: Text(category['name'] as String),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCategoryId = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Country
-                        DropdownButtonFormField<String>(
-                          value: _selectedCountry,
-                          decoration: const InputDecoration(
-                            labelText: 'Country',
-                            border: OutlineInputBorder(),
-                          ),
-                          isExpanded: true, // Ensure dropdown uses full width available
-                          items: _countries.isEmpty
-                              ? []
-                              : _countries.entries.map((entry) {
-                            final countryCode = entry.key;
-                            final countryData = entry.value as Map<String, dynamic>?;
-                            if (countryData == null) {
-                              return DropdownMenuItem<String>(
-                                value: countryCode.toLowerCase(),
-                                child: Text(countryCode.toUpperCase()),
-                              );
-                            }
-                            final countryName = countryData['name'] as String? ?? 'Unknown';
-                            final countryEmoji = countryData['emoji'] as String?;
-
-                            return DropdownMenuItem<String>(
-                              value: countryCode.toLowerCase(),
-                              child: Row(
-                                children: [
-                                  if (countryEmoji != null) Text(countryEmoji + ' '),
-                                  Flexible(
-                                    child: Text(
-                                      countryName,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCountry = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Industry
-                        DropdownButtonFormField<int>(
-                          value: _selectedIndustryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Industry',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: _industries.isEmpty
-                              ? []
-                              : _industries.map((industry) {
-                            return DropdownMenuItem<int>(
-                              value: industry['id'] as int,
-                              child: Text(industry['name'] as String),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedIndustryId = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Description
-                        TextFormField(
-                          controller: _descriptionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Description',
-                            border: OutlineInputBorder(),
-                            alignLabelWithHint: true,
-                          ),
-                          maxLines: 5,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Get category name from selected category ID
-                              String? categoryName;
-                              if (_selectedCategoryId != null) {
-                                final category = categories.firstWhere(
-                                  (category) => category['id'] == _selectedCategoryId,
-                                  orElse: () => {'name': ''},
-                                );
-                                categoryName = category['name'] as String?;
-                              }
-
-                              // Get country name from selected country ID
-                              String? countryName;
-                              if (_selectedCountry != null) {
-                                final countryData = _countries[_selectedCountry] as Map<String, dynamic>?;
-                                if (countryData != null) {
-                                  countryName = countryData['name'] as String?;
-                                }
-                              }
-
-                              // Get industry name from selected industry ID
-                              String? industryName;
-                              if (_selectedIndustryId != null) {
-                                final industry = _industries.firstWhere(
-                                  (industry) => industry['id'] == _selectedIndustryId,
-                                  orElse: () => {'name': ''},
-                                );
-                                industryName = industry['name'] as String?;
-                              }
-
-                              // Create updated award entity
-                              final updatedAward = Award(
-                                id: award.id,
-                                name: _nameController.text,
-                                issuer: _issuerController.text,
-                                date: _dateController.text,
-                                description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-                                categoryId: _selectedCategoryId,
-                                category: categoryName,
-                                countryId: _selectedCountry,
-                                country: countryName,
-                                industryId: _selectedIndustryId,
-                                industry: industryName,
-                              );
-
-                              // Dispatch update event using the stored ResumeBloc instance
-                              resumeBloc.add(UpdateAward(
-                                award: updatedAward,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Award award) {
-    bool _isDeleting = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while deleting
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is AwardDeleted) {
-                // Close dialog when award is deleted
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update deleting state
-                setState(() {
-                  _isDeleting = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Delete Award/Certificate'),
-                content: Text('Are you sure you want to delete "${award.name}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable cancel button while deleting
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable delete button while deleting
-                        : () {
-                            if (award.id != null) {
-                              // Set deleting state
-                              setState(() {
-                                _isDeleting = true;
-                              });
-
-                              // Dispatch delete event using the stored ResumeBloc instance
-                              resumeBloc.add(DeleteAward(
-                                awardId: award.id!,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isDeleting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Delete'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

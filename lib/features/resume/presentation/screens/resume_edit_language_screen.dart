@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../../core/navigation/app_router.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
 
-/// Resume edit language screen - for editing language proficiency
+/// Resume edit language screen
 class ResumeEditLanguageScreen extends StatefulWidget {
-  /// Constructor
   const ResumeEditLanguageScreen({Key? key}) : super(key: key);
 
   @override
@@ -18,91 +16,261 @@ class ResumeEditLanguageScreen extends StatefulWidget {
 }
 
 class _ResumeEditLanguageScreenState extends State<ResumeEditLanguageScreen> {
-  // Profile completion percentage
-  int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // List of languages
   List<Language> _languages = [];
-
-  // Map of language levels
-  Map<String, String> _languageLevels = {};
-
-  // Resume bloc instance
+  List<dynamic> _languageLevels = [];
   late ResumeBloc resumeBloc;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the resumeBloc
     resumeBloc = context.read<ResumeBloc>();
-    // Fetch language information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       resumeBloc.add(const GetResumeSection(section: 'language'));
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Languages'),
-        actions: [
-          // Keep the next button
-          TextButton(
-            onPressed: () {
-              // Navigate to next section (skills)
-              context.goNamed(AppRouter.resumeEditSkills);
-            },
-            child: const Row(
-              children: [
-                Text('Next', style: TextStyle(color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-              ],
+  void _showLanguageSheet(BuildContext context, {Language? existing}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    int? selectedLevelId = existing?.levelId;
+    int listening = existing?.listening ?? 3;
+    int speaking = existing?.speaking ?? 3;
+    int reading = existing?.reading ?? 3;
+    int writing = existing?.writing ?? 3;
+    bool isSaving = false;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: resumeBloc,
+        child: BlocListener<ResumeBloc, ResumeState>(
+          listener: (_, state) {
+            if (state is LanguageAdded || state is LanguageUpdated) Navigator.of(ctx).pop();
+          },
+          child: StatefulBuilder(
+            builder: (ctx3, setSheetState) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx3).viewInsets.bottom),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx3).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 4),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.language_outlined, color: primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            existing == null ? 'Add Language' : 'Edit Language',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextFormField(
+                                controller: nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Language *',
+                                  prefixIcon: Icon(Icons.language_outlined),
+                                  hintText: 'e.g. English, French, Swahili',
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              if (_languageLevels.isNotEmpty)
+                                DropdownButtonFormField<int>(
+                                  value: selectedLevelId,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Overall Level',
+                                    prefixIcon: Icon(Icons.bar_chart_outlined),
+                                  ),
+                                  isExpanded: true,
+                                  items: _languageLevels.map((level) {
+                                    final l = level as Map<String, dynamic>;
+                                    return DropdownMenuItem<int>(
+                                      value: l['id'] as int?,
+                                      child: Text(l['name'] as String? ?? ''),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setSheetState(() => selectedLevelId = v),
+                                ),
+                              if (_languageLevels.isNotEmpty) const SizedBox(height: 16),
+                              Text('Proficiency Breakdown', style: TextStyle(fontWeight: FontWeight.w600, color: primary, fontSize: 13)),
+                              const SizedBox(height: 8),
+                              _buildSkillSlider('Listening', listening, primary, (v) => setSheetState(() => listening = v)),
+                              _buildSkillSlider('Speaking', speaking, primary, (v) => setSheetState(() => speaking = v)),
+                              _buildSkillSlider('Reading', reading, primary, (v) => setSheetState(() => reading = v)),
+                              _buildSkillSlider('Writing', writing, primary, (v) => setSheetState(() => writing = v)),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: isSaving
+                                    ? null
+                                    : () {
+                                        if (formKey.currentState!.validate()) {
+                                          setSheetState(() => isSaving = true);
+                                          final lang = Language(
+                                            id: existing?.id,
+                                            name: nameCtrl.text,
+                                            levelId: selectedLevelId,
+                                            listening: listening,
+                                            speaking: speaking,
+                                            reading: reading,
+                                            writing: writing,
+                                          );
+                                          if (existing == null) {
+                                            resumeBloc.add(AddLanguage(language: lang, candidateId: _candidateId));
+                                          } else {
+                                            resumeBloc.add(UpdateLanguage(language: lang, candidateId: _candidateId));
+                                          }
+                                        }
+                                      },
+                                icon: isSaving
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Icon(Icons.save_outlined),
+                                label: Text(isSaving ? 'Saving...' : 'Save Language'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          // Add navigation menu (at the far right)
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditLanguage),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkillSlider(String label, int value, Color primary, ValueChanged<int> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: Slider(
+              value: value.toDouble(),
+              min: 1, max: 5, divisions: 4,
+              activeColor: primary,
+              label: value.toString(),
+              onChanged: (v) => onChanged(v.round()),
+            ),
+          ),
+          SizedBox(width: 24, child: Text('$value', style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 13))),
         ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Language lang) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Language'),
+        content: Text('Remove "${lang.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              resumeBloc.add(DeleteLanguage(languageId: lang.id!, candidateId: _candidateId));
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProficiencyBar(int value, Color primary) {
+    return Row(
+      children: List.generate(5, (i) => Expanded(
+        child: Container(
+          height: 4,
+          margin: const EdgeInsets.only(right: 2),
+          decoration: BoxDecoration(
+            color: i < value ? primary : primary.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      )),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate to previous section (education)
-            context.goNamed(AppRouter.resumeEditEducation);
-          },
+          onPressed: () => context.goNamed(AppRouter.resumeEditSkills),
         ),
+        actions: [ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditLanguage)],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showLanguageSheet(context),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Language'),
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
           if (state is ResumeSectionLoaded) {
-            // Update profile completion, candidate ID, language levels
             setState(() {
-              _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
-
-              // Get language levels from response
-              final languageLevelsData = state.response.data['language_levels'] as Map<String, dynamic>?;
-              if (languageLevelsData != null) {
-                _languageLevels = languageLevelsData.map((key, value) => MapEntry(key, value as String));
-              }
-
-              // Get language list from response
-              final languageList = state.response.data['languages'] as List<dynamic>?;
-              if (languageList != null) {
-                _languages = languageList.map((e) {
-                  final lang = e as Map<String, dynamic>;
+              _languageLevels = state.response.data['language_levels'] as List<dynamic>? ?? [];
+              final list = state.response.data['languages'] as List<dynamic>?;
+              if (list != null) {
+                _languages = list.map((e) {
+                  final m = e as Map<String, dynamic>;
                   return Language(
-                    id: lang['id'] as int?,
-                    name: lang['name'] as String? ?? '',
-                    listening: lang['listening'] != null ? (lang['listening'] is int ? lang['listening'] as int : (lang['listening'] as double).round()) : null,
-                    speaking: lang['speaking'] != null ? (lang['speaking'] is int ? lang['speaking'] as int : (lang['speaking'] as double).round()) : null,
-                    reading: lang['reading'] != null ? (lang['reading'] is int ? lang['reading'] as int : (lang['reading'] as double).round()) : null,
-                    writing: lang['writing'] != null ? (lang['writing'] is int ? lang['writing'] as int : (lang['writing'] as double).round()) : null,
-                    rating: lang['rating'] != null ? (lang['rating'] is int ? lang['rating'] as int : (lang['rating'] as double).round()) : null,
-                    ratingLabel: lang['rating_label'] as String?,
+                    id: m['id'] as int?,
+                    name: m['name'] as String? ?? '',
+                    levelId: m['language_level_id'] as int?,
+                    level: m['language_level'] as String?,
+                    listening: m['listening'] as int?,
+                    speaking: m['speaking'] as int?,
+                    reading: m['reading'] as int?,
+                    writing: m['writing'] as int?,
                   );
                 }).toList();
               } else {
@@ -110,713 +278,156 @@ class _ResumeEditLanguageScreenState extends State<ResumeEditLanguageScreen> {
               }
             });
           } else if (state is LanguageAdded) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Language added successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the language list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Language added!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'language'));
           } else if (state is LanguageUpdated) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Language updated successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the language list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Language updated!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'language'));
           } else if (state is LanguageDeleted) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Language deleted successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the language list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Language removed!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'language'));
           } else if (state is ResumeError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(state.message), backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
           }
         },
         builder: (context, state) {
-          // Show loading indicator only when initially loading the section
-          // Not when adding, updating, or deleting languages
           if (state is ResumeLoading && _languages.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile completion indicator
-                LinearProgressIndicator(value: _profileCompletion / 100),
-                const SizedBox(height: 8),
-                Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-
-                // Language list
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditLanguage),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    const Text(
-                      'Languages',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const ResumeSectionHeader(
+                      title: 'Languages',
+                      icon: Icons.language_outlined,
+                      subtitle: 'Languages you speak and your proficiency',
                     ),
-                    SizedBox(
-                      width: 100, // Fixed width to avoid infinite constraints
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Show add language dialog/screen
-                          _showAddLanguageDialog(context);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
 
-                // Language list
-                if (_languages.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'No languages added yet. Click the "Add" button to add your languages.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _languages.length,
-                    itemBuilder: (context, index) {
-                      final language = _languages[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
+                    if (_languages.isEmpty)
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Icon(Icons.language_outlined, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text('No languages added yet', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () => _showLanguageSheet(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Language'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary, side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._languages.map((lang) => Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
+                                  Container(
+                                    width: 40, height: 40,
+                                    decoration: BoxDecoration(color: primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                    child: Icon(Icons.language_outlined, color: primary, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
                                   Expanded(
-                                    child: Text(
-                                      language.name,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(lang.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                        if (lang.level != null)
+                                          Text(lang.level!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                      ],
                                     ),
                                   ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () {
-                                          _showEditLanguageDialog(context, language);
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () {
-                                          _showDeleteConfirmationDialog(context, language);
-                                        },
-                                      ),
+                                  PopupMenuButton<String>(
+                                    onSelected: (v) {
+                                      if (v == 'edit') _showLanguageSheet(context, existing: lang);
+                                      if (v == 'delete') _confirmDelete(context, lang);
+                                    },
+                                    itemBuilder: (_) => [
+                                      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+                                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
                                     ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                language.ratingLabel ?? 'Proficiency: ${language.rating ?? 0}/5',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
+                              if (lang.listening != null || lang.speaking != null) ...[
+                                const SizedBox(height: 10),
+                                const Divider(height: 1),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildMiniSkill('Listening', lang.listening ?? 0, primary)),
+                                    Expanded(child: _buildMiniSkill('Speaking', lang.speaking ?? 0, primary)),
+                                    Expanded(child: _buildMiniSkill('Reading', lang.reading ?? 0, primary)),
+                                    Expanded(child: _buildMiniSkill('Writing', lang.writing ?? 0, primary)),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Divider(),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildProficiencyItem('Listening', language.listening ?? 0),
-                                  _buildProficiencyItem('Speaking', language.speaking ?? 0),
-                                  _buildProficiencyItem('Reading', language.reading ?? 0),
-                                  _buildProficiencyItem('Writing', language.writing ?? 0),
-                                ],
-                              ),
+                              ],
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      )).toList(),
 
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Go back to previous section
-                          context.goNamed(AppRouter.resumeEditEducation);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Previous'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Save and navigate to next section
-                          context.goNamed(AppRouter.resumeEditSkills);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Save & Continue'),
-                        ),
-                      ),
+                    ResumeNavButtons(
+                      prevRoute: AppRouter.resumeEditSkills,
+                      nextRoute: AppRouter.resumeEditAwards,
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildProficiencyItem(String label, int level) {
+  Widget _buildMiniSkill(String label, int value, Color primary) {
     return Column(
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
         const SizedBox(height: 4),
-        Row(
-          children: List.generate(
-            5,
-            (index) => Icon(
-              Icons.star,
-              size: 16,
-              color: index < level ? Colors.amber : Colors.grey.shade300,
-            ),
-          ),
-        ),
+        _buildProficiencyBar(value, primary),
+        const SizedBox(height: 2),
+        Text('$value/5', style: TextStyle(fontSize: 10, color: primary, fontWeight: FontWeight.w600)),
       ],
     );
-  }
-
-  void _showAddLanguageDialog(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    int _listening = 3;
-    int _speaking = 3;
-    int _reading = 3;
-    int _writing = 3;
-    bool _isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is LanguageAdded) {
-                // Close dialog when language is added
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Add Language'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Language Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Language *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter language name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Proficiency Sliders
-                        const Text(
-                          'Proficiency Levels',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Listening
-                        _buildProficiencySlider(
-                          'Listening',
-                          _listening,
-                          (value) {
-                            setState(() {
-                              _listening = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Speaking
-                        _buildProficiencySlider(
-                          'Speaking',
-                          _speaking,
-                          (value) {
-                            setState(() {
-                              _speaking = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Reading
-                        _buildProficiencySlider(
-                          'Reading',
-                          _reading,
-                          (value) {
-                            setState(() {
-                              _reading = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Writing
-                        _buildProficiencySlider(
-                          'Writing',
-                          _writing,
-                          (value) {
-                            setState(() {
-                              _writing = value;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Calculate overall rating (average of all skills)
-                              final rating = ((_listening + _speaking + _reading + _writing) / 4).round();
-
-                              // Create language entity
-                              final language = Language(
-                                name: _nameController.text,
-                                listening: _listening,
-                                speaking: _speaking,
-                                reading: _reading,
-                                writing: _writing,
-                                rating: rating,
-                                ratingLabel: _getRatingLabel(rating),
-                              );
-
-                              // Dispatch add event using the stored ResumeBloc instance
-                              resumeBloc.add(AddLanguage(
-                                language: language,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEditLanguageDialog(BuildContext context, Language language) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController(text: language.name);
-    int _listening = language.listening ?? 3;
-    int _speaking = language.speaking ?? 3;
-    int _reading = language.reading ?? 3;
-    int _writing = language.writing ?? 3;
-    bool _isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is LanguageUpdated) {
-                // Close dialog when language is updated
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Edit Language'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Language Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Language *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter language name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Proficiency Sliders
-                        const Text(
-                          'Proficiency Levels',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Listening
-                        _buildProficiencySlider(
-                          'Listening',
-                          _listening,
-                          (value) {
-                            setState(() {
-                              _listening = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Speaking
-                        _buildProficiencySlider(
-                          'Speaking',
-                          _speaking,
-                          (value) {
-                            setState(() {
-                              _speaking = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Reading
-                        _buildProficiencySlider(
-                          'Reading',
-                          _reading,
-                          (value) {
-                            setState(() {
-                              _reading = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Writing
-                        _buildProficiencySlider(
-                          'Writing',
-                          _writing,
-                          (value) {
-                            setState(() {
-                              _writing = value;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Calculate overall rating (average of all skills)
-                              final rating = ((_listening + _speaking + _reading + _writing) / 4).round();
-
-                              // Create updated language entity
-                              final updatedLanguage = Language(
-                                id: language.id,
-                                name: _nameController.text,
-                                listening: _listening,
-                                speaking: _speaking,
-                                reading: _reading,
-                                writing: _writing,
-                                rating: rating,
-                                ratingLabel: _getRatingLabel(rating),
-                              );
-
-                              // Dispatch update event using the stored ResumeBloc instance
-                              resumeBloc.add(UpdateLanguage(
-                                language: updatedLanguage,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Language language) {
-    bool _isDeleting = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while deleting
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is LanguageDeleted) {
-                // Close dialog when language is deleted
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update deleting state
-                setState(() {
-                  _isDeleting = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Delete Language'),
-                content: Text('Are you sure you want to delete "${language.name}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable cancel button while deleting
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable delete button while deleting
-                        : () {
-                            if (language.id != null) {
-                              // Set deleting state
-                              setState(() {
-                                _isDeleting = true;
-                              });
-
-                              // Dispatch delete event using the stored ResumeBloc instance
-                              resumeBloc.add(DeleteLanguage(
-                                languageId: language.id!,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isDeleting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Delete'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildProficiencySlider(String label, int value, Function(int) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label),
-            Row(
-              children: List.generate(
-                5,
-                (index) => Icon(
-                  Icons.star,
-                  size: 16,
-                  color: index < value ? Colors.amber : Colors.grey.shade300,
-                ),
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: value.toDouble(),
-          min: 1,
-          max: 5,
-          divisions: 4,
-          label: _getProficiencyLabel(value),
-          onChanged: (newValue) {
-            onChanged(newValue.round());
-          },
-        ),
-      ],
-    );
-  }
-
-  String _getProficiencyLabel(int value) {
-    switch (value) {
-      case 1:
-        return 'Elementary';
-      case 2:
-        return 'Limited';
-      case 3:
-        return 'Professional';
-      case 4:
-        return 'Full Professional';
-      case 5:
-        return 'Native / Bilingual';
-      default:
-        return 'Professional';
-    }
-  }
-
-  String? _getRatingLabel(int rating) {
-    return _languageLevels[rating.toString()] ?? _getProficiencyLabel(rating);
   }
 }

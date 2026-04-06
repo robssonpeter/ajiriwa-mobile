@@ -7,9 +7,8 @@ import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
 
-/// Resume edit reference screen - for editing references
+/// Resume edit reference (referees) screen
 class ResumeEditReferenceScreen extends StatefulWidget {
-  /// Constructor
   const ResumeEditReferenceScreen({Key? key}) : super(key: key);
 
   @override
@@ -17,73 +16,243 @@ class ResumeEditReferenceScreen extends StatefulWidget {
 }
 
 class _ResumeEditReferenceScreenState extends State<ResumeEditReferenceScreen> {
-  // Profile completion percentage
-  int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // List of references
   List<Reference> _references = [];
-
-  // Countries data from API
-  Map<String, dynamic> _countries = {};
-
-  // Resume bloc instance
   late ResumeBloc resumeBloc;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the resumeBloc
     resumeBloc = context.read<ResumeBloc>();
-    // Fetch references information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       resumeBloc.add(const GetResumeSection(section: 'reference'));
     });
   }
 
+  void _showReferenceSheet(BuildContext context, {Reference? existing}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final positionCtrl = TextEditingController(text: existing?.position ?? '');
+    final companyCtrl = TextEditingController(text: existing?.company ?? '');
+    final emailCtrl = TextEditingController(text: existing?.email ?? '');
+    final phoneCtrl = TextEditingController(text: existing?.phone ?? '');
+    final relationshipCtrl = TextEditingController(text: existing?.relationship ?? '');
+    bool isSaving = false;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: resumeBloc,
+        child: BlocListener<ResumeBloc, ResumeState>(
+          listener: (_, state) {
+            if (state is ReferenceAdded || state is ReferenceUpdated) Navigator.of(ctx).pop();
+          },
+          child: StatefulBuilder(
+            builder: (ctx3, setSheetState) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx3).viewInsets.bottom),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx3).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 4),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.people_outline, color: primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            existing == null ? 'Add Referee' : 'Edit Referee',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                controller: nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Full Name *',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: positionCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Position / Title *',
+                                  prefixIcon: Icon(Icons.badge_outlined),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: companyCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Company / Organisation *',
+                                  prefixIcon: Icon(Icons.business_outlined),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: emailCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  prefixIcon: Icon(Icons.email_outlined),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: phoneCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Phone',
+                                  prefixIcon: Icon(Icons.phone_outlined),
+                                ),
+                                keyboardType: TextInputType.phone,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: relationshipCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Relationship',
+                                  prefixIcon: Icon(Icons.handshake_outlined),
+                                  hintText: 'e.g. Former Manager, Colleague',
+                                ),
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: isSaving
+                                    ? null
+                                    : () {
+                                        if (formKey.currentState!.validate()) {
+                                          setSheetState(() => isSaving = true);
+                                          final ref = Reference(
+                                            id: existing?.id,
+                                            name: nameCtrl.text,
+                                            position: positionCtrl.text,
+                                            company: companyCtrl.text,
+                                            email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+                                            phone: phoneCtrl.text.isNotEmpty ? phoneCtrl.text : null,
+                                            relationship: relationshipCtrl.text.isNotEmpty ? relationshipCtrl.text : null,
+                                          );
+                                          if (existing == null) {
+                                            resumeBloc.add(AddReference(reference: ref, candidateId: _candidateId));
+                                          } else {
+                                            resumeBloc.add(UpdateReference(reference: ref, candidateId: _candidateId));
+                                          }
+                                        }
+                                      },
+                                icon: isSaving
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Icon(Icons.save_outlined),
+                                label: Text(isSaving ? 'Saving...' : 'Save Referee'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Reference ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Referee'),
+        content: Text('Remove "${ref.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              resumeBloc.add(DeleteReference(referenceId: ref.id!, candidateId: _candidateId));
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('References'),
-        actions: [
-          // Add navigation menu
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditReference),
-        ],
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate to previous section (awards)
-            context.goNamed(AppRouter.resumeEditAwards);
-          },
+          onPressed: () => context.goNamed(AppRouter.resumeEditAwards),
         ),
+        actions: [ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditReference)],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showReferenceSheet(context),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Referee'),
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
           if (state is ResumeSectionLoaded) {
-            // Update profile completion, candidate ID
             setState(() {
-              _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
-
-              // Get countries data from response
-              _countries = state.response.countries ?? {};
-
-              // Get references list from response
-              final referencesList = state.response.data['referees'] as List<dynamic>?;
-              if (referencesList != null) {
-                _references = referencesList.map((e) {
-                  final reference = e as Map<String, dynamic>;
+              final list = state.response.data['referees'] as List<dynamic>?;
+              if (list != null) {
+                _references = list.map((e) {
+                  final m = e as Map<String, dynamic>;
                   return Reference(
-                    id: reference['id'] as int?,
-                    name: reference['name'] as String? ?? '',
-                    position: reference['position'] as String? ?? '',
-                    company: reference['company'] as String? ?? '',
-                    email: reference['email'] as String?,
-                    phone: reference['phone'] as String?,
-                    relationship: reference['relationship'] as String?,
+                    id: m['id'] as int?,
+                    name: m['name'] as String? ?? '',
+                    position: m['position'] as String? ?? '',
+                    company: m['company'] as String? ?? '',
+                    email: m['email'] as String?,
+                    phone: m['phone'] as String?,
+                    relationship: m['relationship'] as String?,
                   );
                 }).toList();
               } else {
@@ -91,692 +260,164 @@ class _ResumeEditReferenceScreenState extends State<ResumeEditReferenceScreen> {
               }
             });
           } else if (state is ReferenceAdded) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Reference added successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the references list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Referee added!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'reference'));
           } else if (state is ReferenceUpdated) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Reference updated successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the references list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Referee updated!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'reference'));
           } else if (state is ReferenceDeleted) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Reference deleted successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the references list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Referee removed!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'reference'));
           } else if (state is ResumeError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(state.message), backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
           }
         },
         builder: (context, state) {
-          // Show loading indicator only when initially loading the section
-          // Not when adding, updating, or deleting references
           if (state is ResumeLoading && _references.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile completion indicator
-                LinearProgressIndicator(value: _profileCompletion / 100),
-                const SizedBox(height: 8),
-                Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-
-                // References list
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditReference),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    const Text(
-                      'References',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const ResumeSectionHeader(
+                      title: 'Referees',
+                      icon: Icons.people_outline,
+                      subtitle: 'Professional references who can vouch for you',
                     ),
-                    SizedBox(
-                      width: 100, // Fixed width to avoid infinite constraints
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Show add reference dialog/screen
-                          _showAddReferenceDialog(context);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
 
-                // References list
-                if (_references.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'No references added yet. Click the "Add" button to add your references.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _references.length,
-                    itemBuilder: (context, index) {
-                      final reference = _references[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
+                    if (_references.isEmpty)
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Icon(Icons.people_outline, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text('No referees added yet', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text('Add professional references who can vouch for your work',
+                                style: TextStyle(color: Colors.grey.shade400, fontSize: 12), textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () => _showReferenceSheet(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Referee'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary, side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._references.map((ref) => Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      reference.name,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: primary.withOpacity(0.1),
+                                child: Text(
+                                  ref.name.isNotEmpty ? ref.name[0].toUpperCase() : '?',
+                                  style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 18),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(ref.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    Text('${ref.position} · ${ref.company}', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+                                    if (ref.relationship != null && ref.relationship!.isNotEmpty)
+                                      Text(ref.relationship!, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        if (ref.email != null && ref.email!.isNotEmpty) ...[
+                                          Icon(Icons.email_outlined, size: 12, color: Colors.grey.shade400),
+                                          const SizedBox(width: 3),
+                                          Flexible(child: Text(ref.email!, style: TextStyle(color: Colors.grey.shade500, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                                        ],
+                                        if (ref.phone != null && ref.phone!.isNotEmpty) ...[
+                                          const SizedBox(width: 8),
+                                          Icon(Icons.phone_outlined, size: 12, color: Colors.grey.shade400),
+                                          const SizedBox(width: 3),
+                                          Text(ref.phone!, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                                        ],
+                                      ],
                                     ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () {
-                                          _showEditReferenceDialog(context, reference);
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () {
-                                          _showDeleteConfirmationDialog(context, reference);
-                                        },
-                                      ),
-                                    ],
-                                  ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (v) {
+                                  if (v == 'edit') _showReferenceSheet(context, existing: ref);
+                                  if (v == 'delete') _confirmDelete(context, ref);
+                                },
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+                                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${reference.position} at ${reference.company}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              if (reference.email != null && reference.email!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Email: ${reference.email}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                              if (reference.phone != null && reference.phone!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Phone: ${reference.phone}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                              if (reference.relationship != null && reference.relationship!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Relationship: ${reference.relationship}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      )).toList(),
 
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Go back to previous section
-                          context.goNamed(AppRouter.resumeEditAwards);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Previous'),
-                        ),
-                      ),
+                    ResumeNavButtons(
+                      prevRoute: AppRouter.resumeEditAwards,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Save and finish
-                          _saveAndFinish(context);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Save & Finish'),
+
+                    // Done button
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.goNamed(AppRouter.profile),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('Done – View Profile'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
     );
-  }
-
-  void _showAddReferenceDialog(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    final _positionController = TextEditingController();
-    final _companyController = TextEditingController();
-    final _emailController = TextEditingController();
-    final _phoneController = TextEditingController();
-    final _relationshipController = TextEditingController();
-    bool _isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ReferenceAdded) {
-                // Close dialog when reference is added
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Add Reference'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Reference Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter reference name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Position
-                        TextFormField(
-                          controller: _positionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Position/Title *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter position/title';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Company
-                        TextFormField(
-                          controller: _companyController,
-                          decoration: const InputDecoration(
-                            labelText: 'Company/Organization *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter company/organization';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Email
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value != null && value.isNotEmpty) {
-                              // Simple email validation
-                              if (!value.contains('@') || !value.contains('.')) {
-                                return 'Please enter a valid email';
-                              }
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Phone
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Relationship
-                        TextFormField(
-                          controller: _relationshipController,
-                          decoration: const InputDecoration(
-                            labelText: 'Relationship',
-                            border: OutlineInputBorder(),
-                            hintText: 'e.g., Manager, Colleague, Professor',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Create reference entity
-                              final reference = Reference(
-                                name: _nameController.text,
-                                position: _positionController.text,
-                                company: _companyController.text,
-                                email: _emailController.text.isEmpty ? null : _emailController.text,
-                                phone: _phoneController.text.isEmpty ? null : _phoneController.text,
-                                relationship: _relationshipController.text.isEmpty ? null : _relationshipController.text,
-                              );
-
-                              // Dispatch add event using the stored ResumeBloc instance
-                              resumeBloc.add(AddReference(
-                                reference: reference,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEditReferenceDialog(BuildContext context, Reference reference) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController(text: reference.name);
-    final _positionController = TextEditingController(text: reference.position);
-    final _companyController = TextEditingController(text: reference.company);
-    final _emailController = TextEditingController(text: reference.email ?? '');
-    final _phoneController = TextEditingController(text: reference.phone ?? '');
-    final _relationshipController = TextEditingController(text: reference.relationship ?? '');
-    bool _isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ReferenceUpdated) {
-                // Close dialog when reference is updated
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Edit Reference'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Reference Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter reference name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Position
-                        TextFormField(
-                          controller: _positionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Position/Title *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter position/title';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Company
-                        TextFormField(
-                          controller: _companyController,
-                          decoration: const InputDecoration(
-                            labelText: 'Company/Organization *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter company/organization';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Email
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value != null && value.isNotEmpty) {
-                              // Simple email validation
-                              if (!value.contains('@') || !value.contains('.')) {
-                                return 'Please enter a valid email';
-                              }
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Phone
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Relationship
-                        TextFormField(
-                          controller: _relationshipController,
-                          decoration: const InputDecoration(
-                            labelText: 'Relationship',
-                            border: OutlineInputBorder(),
-                            hintText: 'e.g., Manager, Colleague, Professor',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Create updated reference entity
-                              final updatedReference = Reference(
-                                id: reference.id,
-                                name: _nameController.text,
-                                position: _positionController.text,
-                                company: _companyController.text,
-                                email: _emailController.text.isEmpty ? null : _emailController.text,
-                                phone: _phoneController.text.isEmpty ? null : _phoneController.text,
-                                relationship: _relationshipController.text.isEmpty ? null : _relationshipController.text,
-                              );
-
-                              // Dispatch update event using the stored ResumeBloc instance
-                              resumeBloc.add(UpdateReference(
-                                reference: updatedReference,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Reference reference) {
-    bool _isDeleting = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while deleting
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is ReferenceDeleted) {
-                // Close dialog when reference is deleted
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update deleting state
-                setState(() {
-                  _isDeleting = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Delete Reference'),
-                content: Text('Are you sure you want to delete "${reference.name}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable cancel button while deleting
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable delete button while deleting
-                        : () {
-                            if (reference.id != null) {
-                              // Set deleting state
-                              setState(() {
-                                _isDeleting = true;
-                              });
-
-                              // Dispatch delete event using the stored ResumeBloc instance
-                              resumeBloc.add(DeleteReference(
-                                referenceId: reference.id!,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isDeleting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Delete'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _saveAndFinish(BuildContext context) {
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Resume saved successfully!'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    // Navigate back to profile screen
-    Future.delayed(const Duration(seconds: 1), () {
-      context.goNamed(AppRouter.profile);
-    });
   }
 }

@@ -7,9 +7,8 @@ import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
 
-/// Resume edit skills screen - for editing skills and proficiency levels
+/// Resume edit skills screen
 class ResumeEditSkillsScreen extends StatefulWidget {
-  /// Constructor
   const ResumeEditSkillsScreen({Key? key}) : super(key: key);
 
   @override
@@ -17,80 +16,232 @@ class ResumeEditSkillsScreen extends StatefulWidget {
 }
 
 class _ResumeEditSkillsScreenState extends State<ResumeEditSkillsScreen> {
-  // Profile completion percentage
-  int _profileCompletion = 0;
-
-  // Candidate ID
   int? _candidateId;
-
-  // List of skills
   List<Skill> _skills = [];
-
-  // Resume bloc instance
+  List<dynamic> _skillLevels = [];
   late ResumeBloc resumeBloc;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the resumeBloc
     resumeBloc = context.read<ResumeBloc>();
-    // Fetch skills information when the screen is first loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       resumeBloc.add(const GetResumeSection(section: 'skills'));
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Skills'),
-        actions: [
-          // Keep the next button
-          TextButton(
-            onPressed: () {
-              // Navigate to next section (awards)
-              context.goNamed(AppRouter.resumeEditAwards);
-            },
-            child: const Row(
-              children: [
-                Text('Next', style: TextStyle(color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: Colors.white, size: 16),
-              ],
+  void _showSkillSheet(BuildContext context, {Skill? existing}) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    int? selectedLevelId = existing?.levelId;
+    int rating = existing?.rating ?? 3;
+    bool isSaving = false;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: resumeBloc,
+        child: BlocListener<ResumeBloc, ResumeState>(
+          listener: (_, state) {
+            if (state is SkillAdded || state is SkillUpdated) Navigator.of(ctx).pop();
+          },
+          child: StatefulBuilder(
+            builder: (ctx3, setSheetState) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx3).viewInsets.bottom),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx3).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 4),
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.star_outline, color: primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            existing == null ? 'Add Skill' : 'Edit Skill',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Form(
+                        key: formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: nameCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Skill Name *',
+                                prefixIcon: Icon(Icons.star_outline),
+                                hintText: 'e.g. Flutter, Python, Project Management',
+                              ),
+                              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                              textCapitalization: TextCapitalization.words,
+                            ),
+                            const SizedBox(height: 12),
+                            if (_skillLevels.isNotEmpty)
+                              DropdownButtonFormField<int>(
+                                value: selectedLevelId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Proficiency Level',
+                                  prefixIcon: Icon(Icons.bar_chart_outlined),
+                                ),
+                                isExpanded: true,
+                                items: _skillLevels.map((level) {
+                                  final l = level as Map<String, dynamic>;
+                                  return DropdownMenuItem<int>(
+                                    value: l['id'] as int?,
+                                    child: Text(l['name'] as String? ?? ''),
+                                  );
+                                }).toList(),
+                                onChanged: (v) => setSheetState(() => selectedLevelId = v),
+                              ),
+                            if (_skillLevels.isNotEmpty) const SizedBox(height: 12),
+                            Text('Rating: $rating / 5', style: TextStyle(color: primary, fontWeight: FontWeight.w600, fontSize: 13)),
+                            Slider(
+                              value: rating.toDouble(),
+                              min: 1, max: 5, divisions: 4,
+                              activeColor: primary,
+                              label: rating.toString(),
+                              onChanged: (v) => setSheetState(() => rating = v.round()),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: isSaving
+                                  ? null
+                                  : () {
+                                      if (formKey.currentState!.validate()) {
+                                        setSheetState(() => isSaving = true);
+                                        final skill = Skill(
+                                          id: existing?.id,
+                                          name: nameCtrl.text,
+                                          levelId: selectedLevelId,
+                                          rating: rating,
+                                        );
+                                        if (existing == null) {
+                                          resumeBloc.add(AddSkill(skill: skill, candidateId: _candidateId));
+                                        } else {
+                                          resumeBloc.add(UpdateSkill(skill: skill, candidateId: _candidateId));
+                                        }
+                                      }
+                                    },
+                              icon: isSaving
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.save_outlined),
+                              label: Text(isSaving ? 'Saving...' : 'Save Skill'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 48),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          // Add navigation menu (at the far right)
-          ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditSkills),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Skill skill) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Skill'),
+        content: Text('Remove "${skill.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              resumeBloc.add(DeleteSkill(skillId: skill.id!, candidateId: _candidateId));
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRatingDots(int rating, Color primary) {
+    return Row(
+      children: List.generate(5, (i) => Padding(
+        padding: const EdgeInsets.only(right: 3),
+        child: Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: i < rating ? primary : primary.withOpacity(0.2),
+          ),
+        ),
+      )),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text('Profile Builder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Navigate to previous section (language)
-            context.goNamed(AppRouter.resumeEditLanguage);
-          },
+          onPressed: () => context.goNamed(AppRouter.resumeEditEducation),
         ),
+        actions: [ResumeEditNavigationWidget(currentScreen: AppRouter.resumeEditSkills)],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showSkillSheet(context),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Skill'),
       ),
       body: BlocConsumer<ResumeBloc, ResumeState>(
         listener: (context, state) {
           if (state is ResumeSectionLoaded) {
-            // Update profile completion, candidate ID
             setState(() {
-              _profileCompletion = state.response.data['profile_completion'] as int? ?? 0;
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
-
-              // Get skills list from response
-              final skillsList = state.response.data['skills'] as List<dynamic>?;
-              if (skillsList != null) {
-                _skills = skillsList.map((e) {
-                  final skill = e as Map<String, dynamic>;
+              _skillLevels = state.response.data['skill_levels'] as List<dynamic>? ?? [];
+              final list = state.response.data['skills'] as List<dynamic>?;
+              if (list != null) {
+                _skills = list.map((e) {
+                  final m = e as Map<String, dynamic>;
                   return Skill(
-                    id: skill['id'] as int?,
-                    name: skill['name'] as String? ?? '',
-                    levelId: skill['levelId'] as int?,
-                    level: skill['level'] as String?,
-                    rating: skill['rating'] as int?,
-                    ratingLabel: skill['rating_label'] as String?,
+                    id: m['id'] as int?,
+                    name: m['name'] as String? ?? '',
+                    levelId: m['skill_level_id'] as int?,
+                    level: m['skill_level'] as String?,
+                    rating: m['rating'] as int?,
+                    ratingLabel: m['rating_label'] as String?,
                   );
                 }).toList();
               } else {
@@ -98,636 +249,130 @@ class _ResumeEditSkillsScreenState extends State<ResumeEditSkillsScreen> {
               }
             });
           } else if (state is SkillAdded) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Skill added successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the skills list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Skill added!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'skills'));
           } else if (state is SkillUpdated) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Skill updated successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the skills list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Skill updated!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'skills'));
           } else if (state is SkillDeleted) {
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Skill deleted successfully'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // Refresh the skills list
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 18), SizedBox(width: 8), Text('Skill removed!')]),
+              backgroundColor: primary, behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
             resumeBloc.add(const GetResumeSection(section: 'skills'));
           } else if (state is ResumeError) {
-            // Show error message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(state.message), backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ));
           }
         },
         builder: (context, state) {
-          // Show loading indicator only when initially loading the section
-          // Not when adding, updating, or deleting skills
           if (state is ResumeLoading && _skills.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          // Show form
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile completion indicator
-                LinearProgressIndicator(value: _profileCompletion / 100),
-                const SizedBox(height: 8),
-                Text('$_profileCompletion% Complete', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 24),
-
-                // Skills list
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Column(
+            children: [
+              ResumeSectionProgressBar(currentScreen: AppRouter.resumeEditSkills),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
                   children: [
-                    const Text(
-                      'Skills',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    const ResumeSectionHeader(
+                      title: 'Skills',
+                      icon: Icons.star_outline,
+                      subtitle: 'Highlight your key professional skills',
                     ),
-                    SizedBox(
-                      width: 100, // Fixed width to avoid infinite constraints
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Show add skill dialog/screen
-                          _showAddSkillDialog(context);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
 
-                // Skills list
-                if (_skills.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Text(
-                        'No skills added yet. Click the "Add" button to add your skills.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _skills.length,
-                    itemBuilder: (context, index) {
-                      final skill = _skills[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      skill.name,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        onPressed: () {
-                                          _showEditSkillDialog(context, skill);
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, size: 20),
-                                        onPressed: () {
-                                          _showDeleteConfirmationDialog(context, skill);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                    if (_skills.isEmpty)
+                      ResumeSectionCard(
+                        child: Column(
+                          children: [
+                            Icon(Icons.star_border_outlined, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text('No skills added yet', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: () => _showSkillSheet(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Skill'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primary, side: BorderSide(color: primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              if (skill.rating != null) ...[
-                                const SizedBox(height: 8),
-                                Row(
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ResumeSectionCard(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _skills.map((skill) {
+                            return GestureDetector(
+                              onTap: () => _showSkillSheet(context, existing: skill),
+                              onLongPress: () => _confirmDelete(context, skill),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: primary.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: primary.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      'Rating: ',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
+                                    Text(skill.name, style: TextStyle(color: primary, fontWeight: FontWeight.w600, fontSize: 13)),
+                                    if (skill.rating != null) ...[
+                                      const SizedBox(width: 6),
+                                      _buildRatingDots(skill.rating!, primary),
+                                    ],
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () => _confirmDelete(context, skill),
+                                      child: Icon(Icons.close, size: 14, color: primary.withOpacity(0.6)),
                                     ),
-                                    Flexible(
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: List.generate(5, (index) {
-                                          return Icon(
-                                            index < (skill.rating ?? 0) 
-                                                ? Icons.star 
-                                                : Icons.star_border,
-                                            color: Colors.amber,
-                                            size: 18,
-                                          );
-                                        }),
-                                      ),
-                                    ),
-                                    if (skill.ratingLabel != null && skill.ratingLabel!.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 8.0),
-                                        child: Text(
-                                          '(${skill.ratingLabel})',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
-                              ],
-                            ],
-                          ),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      );
-                    },
-                  ),
+                      ),
 
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Go back to previous section
-                          context.goNamed(AppRouter.resumeEditLanguage);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Previous'),
+                    if (_skills.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Text(
+                          'Tap a skill to edit • Long press or tap × to delete',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Save and navigate to next section
-                          context.goNamed(AppRouter.resumeEditAwards);
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Text('Save & Continue'),
-                        ),
-                      ),
+
+                    ResumeNavButtons(
+                      prevRoute: AppRouter.resumeEditEducation,
+                      nextRoute: AppRouter.resumeEditLanguage,
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
-    );
-  }
-
-  void _showAddSkillDialog(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    int _selectedRating = 1; // Default to 1 to ensure a valid rating
-    bool _isSaving = false;
-
-    // Define rating labels
-    final ratingLabels = {
-      0: '',
-      1: 'Basic',
-      2: 'Limited',
-      3: 'Good',
-      4: 'Very Good',
-      5: 'Excellent',
-    };
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is SkillAdded) {
-                // Close dialog when skill is added
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Add Skill'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Skill Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Skill Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter skill name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Rating
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Rating',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Row(
-                                    children: List.generate(5, (index) {
-                                      return IconButton(
-                                        icon: Icon(
-                                          index < _selectedRating
-                                              ? Icons.star
-                                              : Icons.star_border,
-                                          color: Colors.amber,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _selectedRating = index + 1;
-                                          });
-                                        },
-                                      );
-                                    }),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (_selectedRating > 0)
-                                  Text(
-                                    '(${ratingLabels[_selectedRating]})',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Create skill entity
-                              // Ensure rating is always between 1-5 as required by backend
-                              final effectiveRating = _selectedRating > 0 ? _selectedRating : 1;
-                              final skill = Skill(
-                                name: _nameController.text,
-                                rating: effectiveRating,
-                                ratingLabel: ratingLabels[effectiveRating],
-                              );
-
-                              // Dispatch add event using the stored ResumeBloc instance
-                              resumeBloc.add(AddSkill(
-                                skill: skill,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEditSkillDialog(BuildContext context, Skill skill) {
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController(text: skill.name);
-    int _selectedRating = skill.rating ?? 1; // Default to 1 if no rating
-    bool _isSaving = false;
-
-    // Define rating labels
-    final ratingLabels = {
-      0: '',
-      1: 'Basic',
-      2: 'Limited',
-      3: 'Good',
-      4: 'Very Good',
-      5: 'Excellent',
-    };
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is SkillUpdated) {
-                // Close dialog when skill is updated
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update saving state
-                setState(() {
-                  _isSaving = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Edit Skill'),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Skill Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Skill Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter skill name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Rating
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Rating',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Row(
-                                    children: List.generate(5, (index) {
-                                      return IconButton(
-                                        icon: Icon(
-                                          index < _selectedRating
-                                              ? Icons.star
-                                              : Icons.star_border,
-                                          color: Colors.amber,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _selectedRating = index + 1;
-                                          });
-                                        },
-                                      );
-                                    }),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (_selectedRating > 0)
-                                  Text(
-                                    '(${ratingLabels[_selectedRating]})',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable cancel button while saving
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isSaving
-                        ? null // Disable save button while saving
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              // Set saving state
-                              setState(() {
-                                _isSaving = true;
-                              });
-
-                              // Create updated skill entity
-                              // Ensure rating is always between 1-5 as required by backend
-                              final effectiveRating = _selectedRating > 0 ? _selectedRating : 1;
-                              final updatedSkill = Skill(
-                                id: skill.id,
-                                name: _nameController.text,
-                                rating: effectiveRating,
-                                ratingLabel: ratingLabels[effectiveRating],
-                              );
-
-                              // Dispatch update event using the stored ResumeBloc instance
-                              resumeBloc.add(UpdateSkill(
-                                skill: updatedSkill,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Skill skill) {
-    bool _isDeleting = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Prevent dismissing while deleting
-      builder: (dialogContext) {
-        return BlocProvider.value(
-          value: resumeBloc,
-          child: BlocListener<ResumeBloc, ResumeState>(
-            listener: (context, state) {
-              if (state is SkillDeleted) {
-                // Close dialog when skill is deleted
-                Navigator.of(dialogContext).pop();
-              } else if (state is ResumeError) {
-                // Update deleting state
-                setState(() {
-                  _isDeleting = false;
-                });
-              }
-            },
-            child: StatefulBuilder(
-              builder: (context, setState) => AlertDialog(
-                title: const Text('Delete Skill'),
-                content: Text('Are you sure you want to delete "${skill.name}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable cancel button while deleting
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: _isDeleting
-                        ? null // Disable delete button while deleting
-                        : () {
-                            if (skill.id != null) {
-                              // Set deleting state
-                              setState(() {
-                                _isDeleting = true;
-                              });
-
-                              // Dispatch delete event using the stored ResumeBloc instance
-                              resumeBloc.add(DeleteSkill(
-                                skillId: skill.id!,
-                                candidateId: _candidateId,
-                              ));
-
-                              // Note: Don't pop here, let the BlocListener handle it
-                            }
-                          },
-                    child: _isDeleting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Delete'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
