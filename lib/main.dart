@@ -13,6 +13,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/bloc.dart';
 import 'features/dashboard/presentation/bloc/bloc.dart';
 import 'features/jobs/presentation/bloc/bloc.dart';
+import 'features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
 
 void main() {
   // To make zone errors fatal (as suggested in the error message)
@@ -82,6 +83,9 @@ class AjiriwaApp extends StatelessWidget {
         ),
         BlocProvider<JobsBloc>(
           create: (context) => di.sl<JobsBloc>(),
+        ),
+        BlocProvider<CvOptimizationBloc>(
+          create: (context) => di.sl<CvOptimizationBloc>(),
         ),
       ],
       child: MaterialApp.router(

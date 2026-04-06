@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:html/dom.dart' as dom;
+import '../../../../core/navigation/app_router.dart';
+import '../../../../core/theme/app_theme.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../domain/entities/job_details.dart';
@@ -58,8 +61,36 @@ class JobViewScreen extends StatelessWidget {
                 // Show the apply button at the bottom of the screen when job details are loaded
                 bottomNavigationBar: jobState is JobLoaded
                     ? Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: _buildApplyButtonWithValidation(context, jobState.jobDetails),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildApplyButtonWithValidation(context, jobState.jobDetails),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () => context.push(
+                                  AppRouter.cvOptimizationPath,
+                                  extra: {
+                                    'jobId': jobState.jobDetails.id,
+                                    'jobTitle': jobState.jobDetails.title,
+                                    'companyName': jobState.jobDetails.company.name,
+                                  },
+                                ),
+                                icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                                label: const Text('Optimize CV for this Job'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryColor,
+                                  side: const BorderSide(color: AppTheme.primaryColor),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       )
                     : null,
               );

@@ -33,6 +33,11 @@ import '../../features/resume/data/datasources/resume_remote_data_source_impl.da
 import '../../features/resume/data/repositories/resume_repository_impl.dart';
 import '../../features/resume/domain/repositories/resume_repository.dart';
 import '../../features/resume/presentation/bloc/bloc.dart';
+import '../../features/cv_optimization/data/datasources/cv_optimization_data_source.dart';
+import '../../features/cv_optimization/data/datasources/cv_optimization_data_source_impl.dart';
+import '../../features/cv_optimization/data/repositories/cv_optimization_repository_impl.dart';
+import '../../features/cv_optimization/domain/repositories/cv_optimization_repository.dart';
+import '../../features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
 import '../network/api_client.dart';
 import '../network/network_info.dart';
 import '../network/network_info_impl.dart';
@@ -163,6 +168,17 @@ Future<void> init() async {
     () => ResumeRemoteDataSourceImpl(
       apiClient: sl(),
     ),
+  );
+
+  // Features - CV Optimization
+  sl.registerFactory(
+    () => CvOptimizationBloc(repository: sl()),
+  );
+  sl.registerLazySingleton<CvOptimizationRepository>(
+    () => CvOptimizationRepositoryImpl(dataSource: sl()),
+  );
+  sl.registerLazySingleton<CvOptimizationDataSource>(
+    () => CvOptimizationDataSourceImpl(apiClient: sl()),
   );
 
   // Core

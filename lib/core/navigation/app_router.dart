@@ -27,6 +27,9 @@ import '../../features/resume/presentation/screens/resume_view_screen.dart';
 import '../../features/resume/presentation/bloc/bloc.dart';
 import '../../features/profile/presentation/screens/notification_settings_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
+import '../../features/cv_optimization/presentation/screens/cv_optimization_screen.dart';
+import '../../features/cv_optimization/presentation/screens/subscription_screen.dart';
+import '../../features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
 import '../di/injection_container.dart' as di;
 import '../widgets/main_screen.dart';
 
@@ -62,6 +65,8 @@ class AppRouter {
   // Settings route names
   static const String notificationSettings = 'notification-settings';
   static const String changePassword = 'change-password';
+  static const String cvOptimization = 'cv-optimization';
+  static const String subscription = 'subscription';
 
   // Route paths
   static const String dashboardPath = '/dashboard';
@@ -90,6 +95,8 @@ class AppRouter {
   // Settings route paths
   static const String notificationSettingsPath = '/settings/notifications';
   static const String changePasswordPath = '/settings/change-password';
+  static const String cvOptimizationPath = '/cv-optimization';
+  static const String subscriptionPath = '/subscription';
 
   // Tab indices for bottom navigation
   static const int dashboardTabIndex = 0;
@@ -323,6 +330,33 @@ class AppRouter {
             name: changePassword,
             builder: (context, state) {
               return const ChangePasswordScreen();
+            },
+          ),
+          // CV Optimization route
+          GoRoute(
+            path: cvOptimizationPath,
+            name: cvOptimization,
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return BlocProvider.value(
+                value: di.sl<CvOptimizationBloc>(),
+                child: CvOptimizationScreen(
+                  jobId: extra?['jobId'] as int?,
+                  jobTitle: extra?['jobTitle'] as String?,
+                  companyName: extra?['companyName'] as String?,
+                ),
+              );
+            },
+          ),
+          // Subscription route
+          GoRoute(
+            path: subscriptionPath,
+            name: subscription,
+            builder: (context, state) {
+              return BlocProvider.value(
+                value: di.sl<CvOptimizationBloc>(),
+                child: const SubscriptionScreen(),
+              );
             },
           ),
         ],

@@ -331,6 +331,18 @@ class DashboardScreen extends StatelessWidget {
           label: 'Auto-Apply',
           onTap: () => context.pushNamed('auto_apply'),
         ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.auto_fix_high_rounded,
+          label: 'CV Optimizer',
+          onTap: () => context.pushNamed(AppRouter.cvOptimization),
+        ),
+        _buildQuickActionCard(
+          context,
+          icon: Icons.workspace_premium_rounded,
+          label: 'Subscription',
+          onTap: () => context.pushNamed(AppRouter.subscription),
+        ),
       ],
     );
   }
