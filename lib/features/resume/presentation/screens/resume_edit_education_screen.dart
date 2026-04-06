@@ -339,7 +339,7 @@ class _ResumeEditEducationScreenState extends State<ResumeEditEducationScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _educations.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

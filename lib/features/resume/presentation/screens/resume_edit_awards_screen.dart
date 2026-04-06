@@ -339,7 +339,7 @@ class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _awards.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

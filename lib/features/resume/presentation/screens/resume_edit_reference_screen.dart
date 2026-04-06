@@ -290,7 +290,7 @@ class _ResumeEditReferenceScreenState extends State<ResumeEditReferenceScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _references.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

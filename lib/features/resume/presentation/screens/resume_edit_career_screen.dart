@@ -96,7 +96,7 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _currentHtml.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

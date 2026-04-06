@@ -308,7 +308,7 @@ class _ResumeEditLanguageScreenState extends State<ResumeEditLanguageScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _languages.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

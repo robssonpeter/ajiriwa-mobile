@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/navigation/app_router.dart';
 import '../../../auth/domain/entities/user.dart';
@@ -87,20 +88,18 @@ class ProfileScreen extends StatelessWidget {
             ),
           );
         } else if (state is AuthLoading) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+          return Scaffold(
+            appBar: AppBar(title: const Text('My Profile')),
+            body: _buildProfileSkeleton(context),
           );
         } else {
           // If not authenticated, navigate to login screen
           // Use Future.microtask to ensure navigation happens after the build is complete
           Future.microtask(() => context.goNamed(AppRouter.login));
           // Show loading indicator instead of "Not authenticated" text
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+          return Scaffold(
+            appBar: AppBar(title: const Text('My Profile')),
+            body: _buildProfileSkeleton(context),
           );
         }
       },
@@ -402,6 +401,46 @@ class ProfileScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileSkeleton(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade200,
+      highlightColor: Colors.grey.shade50,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Profile header skeleton
+            Row(
+              children: [
+                Container(width: 80, height: 80, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(width: 180, height: 20, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                    const SizedBox(height: 8),
+                    Container(width: 140, height: 14, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            // Section skeletons
+            ...List.generate(4, (index) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 100, height: 18, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                const SizedBox(height: 16),
+                Container(width: double.infinity, height: 70, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+                const SizedBox(height: 24),
+              ],
+            )),
+          ],
+        ),
       ),
     );
   }

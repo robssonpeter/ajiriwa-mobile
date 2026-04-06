@@ -153,7 +153,7 @@ class _ResumeEditPersonalScreenState extends State<ResumeEditPersonalScreen> {
         },
         builder: (context, state) {
           if (state is ResumeLoading && _firstNameController.text.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(

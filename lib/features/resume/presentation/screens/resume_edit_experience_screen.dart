@@ -364,7 +364,7 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
         },
         builder: (context, state) {
           if (state is ResumeLoading && _experiences.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const ResumeEditSkeleton();
           }
 
           return Column(
