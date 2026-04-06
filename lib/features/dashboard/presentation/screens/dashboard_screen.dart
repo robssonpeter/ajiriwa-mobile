@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/navigation/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/bloc/bloc.dart';
 import '../../domain/entities/dashboard.dart';
 import '../bloc/bloc.dart';
@@ -183,7 +184,7 @@ class DashboardScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.primaryColor.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: BorderSide(color: AppTheme.primaryColor.withOpacity(0.1)),
+          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
         ),
         child: Row(
           children: [
@@ -804,6 +805,57 @@ class DashboardScreen extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => _buildPlaceholder(company.name),
               )
             : _buildPlaceholder(company.name),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonDashboard() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _skeletonBox(height: 60, borderRadius: 12),
+          const SizedBox(height: 24),
+          _skeletonBox(height: 32, width: 160),
+          const SizedBox(height: 8),
+          _skeletonBox(height: 32, width: 120),
+          const SizedBox(height: 24),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.9,
+            children: List.generate(6, (_) => _skeletonBox(borderRadius: 16)),
+          ),
+          const SizedBox(height: 32),
+          _skeletonBox(height: 140, borderRadius: 20),
+          const SizedBox(height: 32),
+          _skeletonBox(height: 24, width: 180),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 180,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, __) => _skeletonBox(width: 200, borderRadius: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _skeletonBox({double? width, double? height, double borderRadius = 8}) {
+    return Container(
+      width: width ?? double.infinity,
+      height: height ?? 80,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
   }
