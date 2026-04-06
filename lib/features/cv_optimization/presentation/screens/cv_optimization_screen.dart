@@ -169,9 +169,9 @@ class _CvOptimizationScreenState extends State<CvOptimizationScreen> {
   Widget _buildHeader(BuildContext context, bool isLoading) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
-        if (authState is! AuthAuthenticated) return const SizedBox.shrink();
+        if (authState is! Authenticated) return const SizedBox.shrink();
         final user = authState.user;
-        final candidateId = user.selectedCandidateId ?? user.candidates?.first.id ?? 0;
+        final candidateId = user.selectedCandidateId ?? user.candidates?.first['id'] as int? ?? 0;
 
         return Container(
           margin: const EdgeInsets.all(16),

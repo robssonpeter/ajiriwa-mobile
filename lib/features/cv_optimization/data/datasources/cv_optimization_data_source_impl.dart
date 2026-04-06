@@ -68,7 +68,14 @@ class CvOptimizationDataSourceImpl implements CvOptimizationDataSource {
   @override
   Future<List<SubscriptionPlanModel>> getSubscriptionPlans() async {
     final response = await apiClient.get('/subscription/plans');
-    final data = response as List<dynamic>? ?? response['data'] as List<dynamic>? ?? [];
+    List<dynamic> data;
+    if (response is List<dynamic>) {
+      data = response;
+    } else if (response is Map<String, dynamic> && response['data'] is List<dynamic>) {
+      data = response['data'] as List<dynamic>;
+    } else {
+      data = [];
+    }
     return data.map((e) => SubscriptionPlanModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
