@@ -167,3 +167,36 @@ class CandidateCreatedState extends ApplyState {
   @override
   List<Object?> get props => [candidate];
 }
+
+/// State when AI cover letter is being generated
+class CoverLetterGenerating extends ApplyState {}
+
+/// State when AI cover letter generation is successful
+class CoverLetterGenerationSuccess extends ApplyState {
+  /// Generated cover letter content
+  final String content;
+
+  /// Generation status (new, refined)
+  final String status;
+
+  /// Constructor
+  const CoverLetterGenerationSuccess({
+    required this.content,
+    required this.status,
+  });
+
+  @override
+  List<Object?> get props => [content, status];
+}
+
+/// State when AI cover letter generation fails
+class CoverLetterGenerationFailure extends ApplyState {
+  /// Error message
+  final String message;
+
+  /// Constructor
+  const CoverLetterGenerationFailure(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}

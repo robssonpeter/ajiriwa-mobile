@@ -59,4 +59,12 @@ abstract class JobDataSource {
 
   /// Create a new candidate (CV) for the current user
   Future<Map<String, dynamic>> createCandidate(String professionalTitle);
+
+  /// Generate an AI cover letter
+  Future<Map<String, dynamic>> generateCoverLetter({
+    required int jobId,
+    String? startingPoint,
+    String? refineInstructions,
+    int? candidateId,
+  });
 }

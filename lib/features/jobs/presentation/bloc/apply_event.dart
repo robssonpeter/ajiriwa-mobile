@@ -191,3 +191,29 @@ class CandidateSelected extends ApplyEvent {
   @override
   List<Object?> get props => [candidateId];
 }
+
+/// Event to generate an AI cover letter
+class CoverLetterGenerated extends ApplyEvent {
+  /// Job ID
+  final int jobId;
+
+  /// Starting point text (optional)
+  final String? startingPoint;
+
+  /// Refinement instructions (optional)
+  final String? refineInstructions;
+
+  /// Candidate ID (optional)
+  final int? candidateId;
+
+  /// Constructor
+  const CoverLetterGenerated({
+    required this.jobId,
+    this.startingPoint,
+    this.refineInstructions,
+    this.candidateId,
+  });
+
+  @override
+  List<Object?> get props => [jobId, startingPoint, refineInstructions, candidateId];
+}

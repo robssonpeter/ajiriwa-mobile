@@ -123,6 +123,23 @@ class _ApplyScreenState extends State<ApplyScreen> {
               'type': cert.label.toLowerCase().contains('resume') ? 'resume' : 'document',
             }).toList();
           });
+        } else if (state is CoverLetterGenerationSuccess) {
+          setState(() {
+            _coverLetterController.text = state.content;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cover letter generated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (state is CoverLetterGenerationFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to generate cover letter: ${state.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       },
       builder: (context, state) {
@@ -253,12 +270,33 @@ class _ApplyScreenState extends State<ApplyScreen> {
           ],
 
           // Cover letter
-          const Text(
-            'Cover Letter',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Cover Letter',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (state is CoverLetterGenerating)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () => _generateAiCoverLetter(context),
+                  icon: const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(_coverLetterController.text.isEmpty ? 'Write for me' : 'Refine with AI'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           TextField(
@@ -927,6 +965,73 @@ class _ApplyScreenState extends State<ApplyScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _generateAiCoverLetter(BuildContext context) {
+    if (_jobDetails == null) return;
+
+    final startingPoint = _coverLetterController.text.isNotEmpty ? _coverLetterController.text : null;
+
+    if (startingPoint != null) {
+      // Show refinement dialog
+      _showRefinementDialog(context, startingPoint);
+    } else {
+      // Direct generation
+      context.read<ApplyBloc>().add(
+        CoverLetterGenerated(
+          jobId: _jobDetails!.id,
+          candidateId: widget.candidateId,
+        ),
+      );
+    }
+  }
+
+  void _showRefinementDialog(BuildContext context, String startingPoint) {
+    final TextEditingController refineController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Refine with AI'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Tell AI how you want to refine your cover letter:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: refineController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g., Make it more formal, emphasize my leadership skills, etc.',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final instructions = refineController.text.trim();
+              Navigator.pop(context);
+              this.context.read<ApplyBloc>().add(
+                CoverLetterGenerated(
+                  jobId: _jobDetails!.id,
+                  startingPoint: startingPoint,
+                  refineInstructions: instructions.isNotEmpty ? instructions : null,
+                  candidateId: widget.candidateId,
+                ),
+              );
+            },
+            child: const Text('Refine'),
+          ),
+        ],
       ),
     );
   }

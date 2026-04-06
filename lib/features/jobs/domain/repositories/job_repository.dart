@@ -73,4 +73,12 @@ abstract class JobRepository {
 
   /// Create a new candidate (CV) for the current user
   Future<Either<Failure, Map<String, dynamic>>> createCandidate(String professionalTitle);
+
+  /// Generate an AI cover letter
+  Future<Either<Failure, Map<String, dynamic>>> generateCoverLetter({
+    required int jobId,
+    String? startingPoint,
+    String? refineInstructions,
+    int? candidateId,
+  });
 }

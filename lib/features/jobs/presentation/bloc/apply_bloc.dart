@@ -23,6 +23,29 @@ class ApplyBloc extends Bloc<ApplyEvent, ApplyState> {
     on<CandidatesRequested>(_onCandidatesRequested);
     on<CandidateCreated>(_onCandidateCreated);
     on<CandidateSelected>(_onCandidateSelected);
+    on<CoverLetterGenerated>(_onCoverLetterGenerated);
+  }
+
+  /// Handle AI cover letter generation
+  Future<void> _onCoverLetterGenerated(
+    CoverLetterGenerated event,
+    Emitter<ApplyState> emit,
+  ) async {
+    emit(CoverLetterGenerating());
+    final result = await jobRepository.generateCoverLetter(
+      jobId: event.jobId,
+      startingPoint: event.startingPoint,
+      refineInstructions: event.refineInstructions,
+      candidateId: event.candidateId,
+    );
+    result.fold(
+      (failure) => emit(CoverLetterGenerationFailure(failure.toString())),
+      (response) {
+        final content = response['content'] as String;
+        final status = response['status'] as String? ?? 'new';
+        emit(CoverLetterGenerationSuccess(content: content, status: status));
+      },
+    );
   }
 
   /// Handle apply eligibility requested event

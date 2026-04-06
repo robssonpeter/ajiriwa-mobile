@@ -408,4 +408,35 @@ class JobDataSourceImpl implements JobDataSource {
       }
     }
   }
+
+  @override
+  Future<Map<String, dynamic>> generateCoverLetter({
+    required int jobId,
+    String? startingPoint,
+    String? refineInstructions,
+    int? candidateId,
+  }) async {
+    try {
+      final response = await apiClient.post('/cover-letter/generate', data: {
+        'job_id': jobId,
+        if (startingPoint != null) 'starting_point': startingPoint,
+        if (refineInstructions != null) 'refine_instructions': refineInstructions,
+        if (candidateId != null) 'candidate_id': candidateId,
+      });
+
+      if (response == null) {
+        throw ServerException('Failed to generate cover letter');
+      }
+
+      return response as Map<String, dynamic>;
+    } catch (e, stackTrace) {
+      print('Generate Cover Letter Data Source Error: $e');
+      print('Stack Trace: $stackTrace');
+      if (e is ServerException) {
+        throw e;
+      } else {
+        throw ServerException('Failed to generate cover letter: ${e.toString()}');
+      }
+    }
+  }
 }
