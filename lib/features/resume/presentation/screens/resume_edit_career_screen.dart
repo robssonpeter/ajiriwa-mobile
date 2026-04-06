@@ -129,33 +129,35 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
                               border: Border.all(color: Colors.grey.shade300),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: HtmlEditor(
-                              controller: _htmlController,
-                              htmlEditorOptions: const HtmlEditorOptions(
-                                hint: 'Write your career objective or personal summary here...',
-                                shouldEnsureVisible: true,
-                                autoAdjustHeight: true,
-                                adjustHeightForKeyboard: true,
-                                height: 250,
-                              ),
-                              htmlToolbarOptions: HtmlToolbarOptions(
-                                toolbarPosition: ToolbarPosition.aboveEditor,
-                                toolbarType: ToolbarType.nativeScrollable,
-                                defaultToolbarButtons: [
-                                  const StyleButtons(),
-                                  const FontSettingButtons(fontSizeUnit: false),
-                                  const ListButtons(listStyles: false),
-                                  const ParagraphButtons(
-                                    textDirection: false,
-                                    lineHeight: false,
-                                    caseConverter: false,
-                                  ),
-                                ],
-                              ),
-                              callbacks: Callbacks(
-                                onChangeContent: (changed) {
-                                  if (changed != null) setState(() => _currentHtml = changed);
-                                },
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 250),
+                              child: HtmlEditor(
+                                controller: _htmlController,
+                                htmlEditorOptions: const HtmlEditorOptions(
+                                  hint: 'Write your career objective or personal summary here...',
+                                  shouldEnsureVisible: true,
+                                  autoAdjustHeight: true,
+                                  adjustHeightForKeyboard: true,
+                                ),
+                                htmlToolbarOptions: HtmlToolbarOptions(
+                                  toolbarPosition: ToolbarPosition.aboveEditor,
+                                  toolbarType: ToolbarType.nativeScrollable,
+                                  defaultToolbarButtons: [
+                                    const StyleButtons(),
+                                    const FontSettingButtons(fontSizeUnit: false),
+                                    const ListButtons(listStyles: false),
+                                    const ParagraphButtons(
+                                      textDirection: false,
+                                      lineHeight: false,
+                                      caseConverter: false,
+                                    ),
+                                  ],
+                                ),
+                                callbacks: Callbacks(
+                                  onChangeContent: (changed) {
+                                    if (changed != null) setState(() => _currentHtml = changed);
+                                  },
+                                ),
                               ),
                             ),
                           ),
