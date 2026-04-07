@@ -86,9 +86,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ─────────────────────────────────────────────
 
   Widget _buildContent(BuildContext context, User user, Dashboard dashboard) {
-    final inReviewCount =
-        dashboard.recentApplications.where((a) => a.status == 2).length;
-
     return RefreshIndicator(
       color: AppTheme.primaryColor,
       onRefresh: () async {
@@ -97,55 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: CustomScrollView(
         slivers: [
           // Header
-          SliverToBoxAdapter(child: _buildHeader(context, user)),
-
-          // Profile completion banner (only when incomplete)
-          if (dashboard.profileCompletion.percentage < 100)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: _buildProfileCompletionBanner(
-                    context, dashboard.profileCompletion),
-              ),
-            ),
-
-          // Stats strip
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildStatsStrip(dashboard, inReviewCount),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // Quick actions (power features not in bottom nav)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildQuickActions(context),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // Profile switcher (only when multiple profiles exist)
-          if (user.candidates != null && user.candidates!.length > 1) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: _buildProfileSwitcher(context, user),
-              ),
-            ),
-          ],
-
-          // Auto-apply card (only when configured)
-          if (dashboard.autoApplySettings != null) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: _buildAutoApplyCard(context, dashboard),
-              ),
-            ),
-          ],
+          SliverToBoxAdapter(child: _buildHeader(context, user, dashboard)),
 
           // Recommended jobs
           SliverToBoxAdapter(
@@ -171,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 12),
                 _buildJobCards(context, dashboard.recommendedJobs),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
               ],
             ),
           ),
@@ -219,65 +168,147 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // HEADER
   // ─────────────────────────────────────────────
 
-  Widget _buildHeader(BuildContext context, User user) {
+  Widget _buildHeader(BuildContext context, User user, Dashboard dashboard) {
     final firstName = user.name.split(' ').first;
+    final hasMultipleProfiles =
+        user.candidates != null && user.candidates!.length > 1;
+    final pc = dashboard.profileCompletion;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildAvatar(user),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getGreeting(),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      firstName,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Notification bell
+              IconButton(
+                onPressed: () {},
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(Icons.notifications_none_rounded,
+                        size: 26, color: Colors.grey.shade600),
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Profile switcher — compact inline chip, only when multiple profiles
+          if (hasMultipleProfiles) ...[
+            const SizedBox(height: 10),
+            _buildInlineProfileSwitcher(context, user),
+          ],
+
+          // Profile completion nudge — single line, only when significantly incomplete
+          if (pc.percentage < 70) ...[
+            const SizedBox(height: 10),
+            _buildCompletionNudge(context, pc),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineProfileSwitcher(BuildContext context, User user) {
+    final selected = user.candidates?.firstWhere(
+      (c) => c['id'] == user.selectedCandidateId,
+      orElse: () => user.candidates!.first,
+    );
+
+    return GestureDetector(
+      onTap: () => _showProfileSelectionSheet(context, user),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_outline,
+                size: 14, color: AppTheme.primaryColor),
+            const SizedBox(width: 6),
+            Text(
+              selected?['label'] ?? 'Default CV',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.unfold_more,
+                size: 14, color: AppTheme.primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompletionNudge(BuildContext context, ProfileCompletion pc) {
+    return GestureDetector(
+      onTap: () => context.pushNamed('resume_edit'),
       child: Row(
         children: [
-          _buildAvatar(user),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getGreeting(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  firstName,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                if (user.headline != null && user.headline!.isNotEmpty)
-                  Text(
-                    user.headline!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              width: 80,
+              height: 4,
+              child: LinearProgressIndicator(
+                value: pc.percentage / 100,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
+              ),
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(Icons.notifications_none_rounded,
-                    size: 28, color: Colors.grey.shade700),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
+          const SizedBox(width: 8),
+          Text(
+            'Profile ${pc.percentage}% complete — tap to finish',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade500,
             ),
           ),
         ],
@@ -309,286 +340,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: Colors.white,
           fontWeight: FontWeight.bold,
           fontSize: 16,
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // STATS STRIP
-  // ─────────────────────────────────────────────
-
-  Widget _buildStatsStrip(Dashboard dashboard, int inReviewCount) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Row(
-        children: [
-          _buildStat(
-            label: 'Applications',
-            value: dashboard.recentApplications.length.toString(),
-            icon: Icons.send_rounded,
-            color: Colors.blue,
-          ),
-          _buildStatDivider(),
-          _buildStat(
-            label: 'In Review',
-            value: inReviewCount.toString(),
-            icon: Icons.access_time_rounded,
-            color: Colors.orange,
-          ),
-          _buildStatDivider(),
-          _buildStat(
-            label: 'Job Matches',
-            value: dashboard.jobMatchCount.toString(),
-            icon: Icons.recommend_rounded,
-            color: AppTheme.primaryColor,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStat({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-          ),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(width: 1, height: 48, color: Colors.grey.shade100);
-  }
-
-  // ─────────────────────────────────────────────
-  // QUICK ACTIONS
-  // ─────────────────────────────────────────────
-
-  Widget _buildQuickActions(BuildContext context) {
-    final actions = [
-      _QuickAction(
-        icon: Icons.description_outlined,
-        label: 'Update CV',
-        color: const Color(0xFF3B82F6),
-        onTap: () => context.pushNamed('resume_edit'),
-      ),
-      _QuickAction(
-        icon: Icons.auto_fix_high_rounded,
-        label: 'CV Optimizer',
-        color: const Color(0xFF8B5CF6),
-        onTap: () => context.pushNamed(AppRouter.cvOptimization),
-      ),
-      _QuickAction(
-        icon: Icons.bolt_rounded,
-        label: 'Auto-Apply',
-        color: const Color(0xFFF59E0B),
-        onTap: () => context.pushNamed('auto_apply'),
-      ),
-      _QuickAction(
-        icon: Icons.workspace_premium_rounded,
-        label: 'Premium',
-        color: const Color(0xFFEC4899),
-        onTap: () => context.pushNamed(AppRouter.subscription),
-      ),
-    ];
-
-    return Row(
-      children: actions.asMap().entries.map((entry) {
-        final isLast = entry.key == actions.length - 1;
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: isLast ? 0 : 12),
-            child: _buildQuickActionTile(entry.value),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildQuickActionTile(_QuickAction action) {
-    return InkWell(
-      onTap: action.onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: action.color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: action.color.withOpacity(0.15)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(action.icon, color: action.color, size: 26),
-            const SizedBox(height: 6),
-            Text(
-              action.label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: action.color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // PROFILE COMPLETION BANNER
-  // ─────────────────────────────────────────────
-
-  Widget _buildProfileCompletionBanner(
-      BuildContext context, ProfileCompletion pc) {
-    final accentColor =
-        pc.percentage < 50 ? Colors.orange : AppTheme.primaryColor;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            height: 44,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: pc.percentage / 100,
-                  strokeWidth: 4,
-                  backgroundColor: accentColor.withOpacity(0.15),
-                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                ),
-                Text(
-                  '${pc.percentage}%',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: accentColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Complete your profile',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-                if (pc.missingSections.isNotEmpty)
-                  Text(
-                    'Missing: ${pc.missingSections.take(2).join(', ')}${pc.missingSections.length > 2 ? ' +${pc.missingSections.length - 2} more' : ''}',
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-              ],
-            ),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: accentColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () => context.pushNamed('resume_edit'),
-            child: const Text('Fix', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // PROFILE SWITCHER
-  // ─────────────────────────────────────────────
-
-  Widget _buildProfileSwitcher(BuildContext context, User user) {
-    final selectedCandidate = user.candidates?.firstWhere(
-      (c) => c['id'] == user.selectedCandidateId,
-      orElse: () => user.candidates!.first,
-    );
-
-    return InkWell(
-      onTap: () => _showProfileSelectionSheet(context, user),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: AppTheme.primaryColor,
-              child: const Icon(Icons.person, size: 18, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Active Profile',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  Text(
-                    selectedCandidate?['label'] ?? 'Default CV',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.swap_horiz, color: AppTheme.primaryColor),
-          ],
         ),
       ),
     );
@@ -656,127 +407,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // AUTO-APPLY CARD
-  // ─────────────────────────────────────────────
-
-  Widget _buildAutoApplyCard(BuildContext context, Dashboard dashboard) {
-    final isEnabled = dashboard.autoApplySettings?.enabled ?? false;
-    final statusColor = isEnabled ? Colors.green : Colors.red;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.bolt_rounded,
-                      color: Colors.amber, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Auto-Apply',
-                  style:
-                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isEnabled ? 'Active' : 'Inactive',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade100),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Row(
-              children: [
-                _buildAutoStat(Icons.search_rounded, Colors.blue, 'Found',
-                    dashboard.jobMatchCount.toString()),
-                _buildAutoStat(Icons.check_circle_outline_rounded, Colors.green,
-                    'Applied', dashboard.autoAppliedCount.toString()),
-                _buildAutoStat(Icons.bar_chart_rounded, Colors.purple,
-                    'Success', '28%'),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade100),
-          TextButton.icon(
-            onPressed: () => context.pushNamed('auto_apply'),
-            icon: const Icon(Icons.settings_outlined, size: 16),
-            label: const Text('Manage Auto-Apply'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppTheme.primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAutoStat(
-      IconData icon, Color color, String label, String value) {
-    return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 14),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        ],
       ),
     );
   }
@@ -1062,6 +692,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header skeleton
             Row(
               children: [
                 _shimmerBox(width: 48, height: 48, borderRadius: 24),
@@ -1076,23 +707,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            _shimmerBox(height: 88, borderRadius: 16),
-            const SizedBox(height: 24),
-            Row(
-              children: List.generate(
-                4,
-                (i) => Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: i < 3 ? 12 : 0),
-                    child: _shimmerBox(height: 72, borderRadius: 14),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
+            // Section title
             _shimmerBox(width: 180, height: 18),
             const SizedBox(height: 12),
+            // Job cards
             SizedBox(
               height: 196,
               child: ListView.separated(
@@ -1104,9 +723,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _shimmerBox(width: 220, height: 196, borderRadius: 16),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
+            // Section title
             _shimmerBox(width: 160, height: 18),
             const SizedBox(height: 12),
+            // Application items
             ...List.generate(
               3,
               (_) => Padding(
@@ -1236,16 +857,3 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _QuickAction {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-}
