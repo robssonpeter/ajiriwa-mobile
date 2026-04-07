@@ -79,6 +79,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
                     isApplied: job.isApplied,
                     isSaved: job.isSaved,
                     slug: job.slug,
+                    postedAt: job.postedAt,
                     company: Company(
                       id: job.company.id,
                       name: job.company.name,
@@ -93,6 +94,8 @@ class DashboardRepositoryImpl implements DashboardRepository {
               : null,
           jobMatchCount: dashboardModel.jobMatchCount,
           autoAppliedCount: dashboardModel.autoAppliedCount,
+          totalApplicationsCount: dashboardModel.totalApplicationsCount,
+          unreadNotificationsCount: dashboardModel.unreadNotificationsCount,
         );
         return Right(dashboard);
       } on ServerException catch (e) {

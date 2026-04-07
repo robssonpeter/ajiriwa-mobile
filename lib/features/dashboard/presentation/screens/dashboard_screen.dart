@@ -126,26 +126,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           // Recent applications
-          if (dashboard.recentApplications.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Recent Applications',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    TextButton(
-                      onPressed: () => context.goNamed('applications'),
-                      child: const Text('View All'),
-                    ),
-                  ],
-                ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Applications',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      if (dashboard.totalApplicationsCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${dashboard.totalApplicationsCount}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () => context.goNamed('applications'),
+                    child: const Text('View All'),
+                  ),
+                ],
               ),
             ),
+          ),
+          if (dashboard.recentApplications.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: _buildEmptyApplications(context),
+              ),
+            )
+          else
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) => Padding(
@@ -156,7 +186,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 childCount: dashboard.recentApplications.length,
               ),
             ),
-          ],
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -206,7 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-              // Notification bell
+              // Notification bell with unread count
               IconButton(
                 onPressed: () {},
                 icon: Stack(
@@ -214,18 +243,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Icon(Icons.notifications_none_rounded,
                         size: 26, color: Colors.grey.shade600),
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
+                    if (dashboard.unreadNotificationsCount > 0)
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                              minWidth: 16, minHeight: 16),
+                          child: Text(
+                            dashboard.unreadNotificationsCount > 9
+                                ? '9+'
+                                : '${dashboard.unreadNotificationsCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -464,6 +506,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final salary = (job.minSalary != null && job.maxSalary != null)
         ? 'TZS ${_formatSalary(job.minSalary!)}–${_formatSalary(job.maxSalary!)}'
         : null;
+    final badge = _jobBadge(job);
 
     return GestureDetector(
       onTap: () {
@@ -494,10 +537,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _buildCompanyLogo(job.company, size: 38),
                 const Spacer(),
-                _buildBadge(
-                  job.isApplied ? 'Applied' : 'New',
-                  job.isApplied ? Colors.blue : AppTheme.primaryColor,
-                ),
+                if (badge != null)
+                  _buildBadge(badge.label, badge.color),
               ],
             ),
             const SizedBox(height: 10),
@@ -548,6 +589,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Returns the most meaningful badge for a job card, in priority order:
+  /// Applied > Closing soon (≤5d) > New (posted ≤7d) > null
+  _JobBadge? _jobBadge(RecommendedJob job) {
+    if (job.isApplied) {
+      return _JobBadge('Applied', Colors.blue);
+    }
+    if (job.deadline.isNotEmpty) {
+      try {
+        final deadline = DateTime.parse(job.deadline);
+        final daysLeft = deadline.difference(DateTime.now()).inDays;
+        if (daysLeft >= 0 && daysLeft <= 5) {
+          final color = daysLeft <= 2 ? Colors.red : Colors.orange;
+          final label = daysLeft == 0 ? 'Last day' : '${daysLeft}d left';
+          return _JobBadge(label, color);
+        }
+      } catch (_) {}
+    }
+    if (job.postedAt != null) {
+      try {
+        final posted = DateTime.parse(job.postedAt!);
+        final daysAgo = DateTime.now().difference(posted).inDays;
+        if (daysAgo <= 7) return _JobBadge('New', AppTheme.primaryColor);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Widget _buildEmptyApplications(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.send_outlined, size: 36, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          Text(
+            'No applications yet',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Start applying to jobs above to track your progress here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+          ),
+        ],
       ),
     );
   }
@@ -855,5 +954,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Colors.grey;
     }
   }
+}
+
+class _JobBadge {
+  final String label;
+  final Color color;
+  const _JobBadge(this.label, this.color);
 }
 

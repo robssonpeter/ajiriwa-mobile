@@ -20,6 +20,12 @@ class Dashboard extends Equatable {
   /// Auto-applied count
   final int autoAppliedCount;
 
+  /// Total applications count (all time)
+  final int totalApplicationsCount;
+
+  /// Unread notifications count
+  final int unreadNotificationsCount;
+
   /// Constructor
   const Dashboard({
     required this.profileCompletion,
@@ -28,6 +34,8 @@ class Dashboard extends Equatable {
     this.autoApplySettings,
     required this.jobMatchCount,
     required this.autoAppliedCount,
+    required this.totalApplicationsCount,
+    required this.unreadNotificationsCount,
   });
 
   @override
@@ -38,6 +46,8 @@ class Dashboard extends Equatable {
         autoApplySettings,
         jobMatchCount,
         autoAppliedCount,
+        totalApplicationsCount,
+        unreadNotificationsCount,
       ];
 }
 
@@ -134,6 +144,9 @@ class RecommendedJob extends Equatable {
   /// Job slug for URL
   final String? slug;
 
+  /// Date the job was posted (YYYY-MM-DD)
+  final String? postedAt;
+
   /// Company information
   final Company company;
 
@@ -149,6 +162,7 @@ class RecommendedJob extends Equatable {
     required this.isApplied,
     required this.isSaved,
     this.slug,
+    this.postedAt,
     required this.company,
   });
 
@@ -164,6 +178,7 @@ class RecommendedJob extends Equatable {
         isApplied,
         isSaved,
         slug,
+        postedAt,
         company,
       ];
 }

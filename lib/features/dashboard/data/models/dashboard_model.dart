@@ -20,6 +20,12 @@ class DashboardModel extends Equatable {
   /// Auto-applied count
   final int autoAppliedCount;
 
+  /// Total applications count (all time)
+  final int totalApplicationsCount;
+
+  /// Unread notifications count
+  final int unreadNotificationsCount;
+
   /// Constructor
   const DashboardModel({
     required this.profileCompletion,
@@ -28,6 +34,8 @@ class DashboardModel extends Equatable {
     this.autoApplySettings,
     required this.jobMatchCount,
     required this.autoAppliedCount,
+    required this.totalApplicationsCount,
+    required this.unreadNotificationsCount,
   });
 
   /// Create a dashboard model from JSON
@@ -47,6 +55,8 @@ class DashboardModel extends Equatable {
           : null,
       jobMatchCount: json['job_match_count'] as int? ?? 0,
       autoAppliedCount: json['auto_applied_count'] as int? ?? 0,
+      totalApplicationsCount: json['total_applications_count'] as int? ?? 0,
+      unreadNotificationsCount: json['unread_notifications_count'] as int? ?? 0,
     );
   }
 
@@ -58,6 +68,8 @@ class DashboardModel extends Equatable {
         autoApplySettings,
         jobMatchCount,
         autoAppliedCount,
+        totalApplicationsCount,
+        unreadNotificationsCount,
       ];
 }
 
@@ -178,6 +190,9 @@ class RecommendedJobModel extends Equatable {
   /// Job slug for URL
   final String? slug;
 
+  /// Date the job was posted (YYYY-MM-DD)
+  final String? postedAt;
+
   /// Company information
   final CompanyModel company;
 
@@ -193,6 +208,7 @@ class RecommendedJobModel extends Equatable {
     required this.isApplied,
     required this.isSaved,
     this.slug,
+    this.postedAt,
     required this.company,
   });
 
@@ -201,14 +217,15 @@ class RecommendedJobModel extends Equatable {
     return RecommendedJobModel(
       id: json['id'] as int,
       title: json['title'] as String,
-      location: json['location'] as String,
+      location: json['location'] as String? ?? '',
       minSalary: json['min_salary'] as int?,
       maxSalary: json['max_salary'] as int?,
-      type: json['type'] as String,
-      deadline: json['deadline'] as String,
-      isApplied: json['is_applied'] as bool,
-      isSaved: json['is_saved'] as bool,
+      type: json['type'] as String? ?? '',
+      deadline: json['deadline'] as String? ?? '',
+      isApplied: json['is_applied'] as bool? ?? false,
+      isSaved: json['is_saved'] as bool? ?? false,
       slug: json['slug'] as String?,
+      postedAt: json['posted_at'] as String?,
       company: CompanyModel.fromJson(json['company'] as Map<String, dynamic>),
     );
   }
@@ -225,6 +242,7 @@ class RecommendedJobModel extends Equatable {
         isApplied,
         isSaved,
         slug,
+        postedAt,
         company,
       ];
 }
