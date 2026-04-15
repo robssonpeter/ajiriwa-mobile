@@ -35,6 +35,12 @@ class Award extends Equatable {
   /// Industry name
   final String? industry;
 
+  /// Attachment URL (from server)
+  final String? attachment;
+
+  /// Local file path for upload
+  final String? filePath;
+
   /// Constructor
   const Award({
     this.id,
@@ -48,6 +54,8 @@ class Award extends Equatable {
     this.country,
     this.industryId,
     this.industry,
+    this.attachment,
+    this.filePath,
   });
 
   @override
@@ -63,5 +71,7 @@ class Award extends Equatable {
         country,
         industryId,
         industry,
+        attachment,
+        filePath,
       ];
 }

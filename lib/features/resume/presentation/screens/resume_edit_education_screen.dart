@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../core/navigation/app_router.dart';
+import '../../../../../core/network/api_client.dart';
+import '../../../../../injection_container.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
@@ -31,16 +33,117 @@ class _ResumeEditEducationScreenState extends State<ResumeEditEducationScreen> {
     });
   }
 
+  Future<void> _fetchAiSuggestions(
+    BuildContext context,
+    TextEditingController institutionCtrl,
+    TextEditingController degreeCtrl,
+    TextEditingController fieldCtrl,
+    TextEditingController achCtrl,
+    Function(bool) setLoading,
+  ) async {
+    if (_candidateId == null) return;
+
+    setLoading(true);
+
+    try {
+      final apiClient = sl<ApiClient>();
+      final response = await apiClient.post('/ai/education/templates', data: {
+        'candidate_id': _candidateId,
+        'program': degreeCtrl.text,
+        'institution': institutionCtrl.text,
+        'field': fieldCtrl.text,
+        'achievements': achCtrl.text,
+      });
+
+      if (response != null && response is List) {
+        _showAiSuggestionsDialog(context, response, achCtrl);
+      } else if (response != null && response['error'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['error']), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch AI suggestions: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  void _showAiSuggestionsDialog(BuildContext context, List suggestions, TextEditingController achCtrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'AI Education Suggestions',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Text(
+                'Choose a refined description for your education.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: suggestions.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final template = suggestions[index]['template'] as String;
+                    return InkWell(
+                      onTap: () {
+                        achCtrl.text = template;
+                        Navigator.pop(ctx);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          template,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showEducationSheet(BuildContext context, {Education? existing}) {
     final formKey = GlobalKey<FormState>();
     final institutionCtrl = TextEditingController(text: existing?.institution ?? '');
     final degreeCtrl = TextEditingController(text: existing?.degree ?? '');
     final fieldCtrl = TextEditingController(text: existing?.fieldOfStudy ?? '');
+    final achCtrl = TextEditingController(text: existing?.achievements ?? '');
     int? startYear = existing?.startDate;
     int? endYear = existing?.endDate != null ? int.tryParse(existing!.endDate!) : null;
     bool isCurrent = existing?.isCurrent ?? false;
     int? selectedLevelId = existing?.educationLevelId;
     bool isSaving = false;
+    bool isAiLoading = false;
 
     final primary = Theme.of(context).colorScheme.primary;
     final currentYear = DateTime.now().year;
@@ -74,12 +177,32 @@ class _ResumeEditEducationScreenState extends State<ResumeEditEducationScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.school_outlined, color: primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            existing == null ? 'Add Education' : 'Edit Education',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                          Row(
+                            children: [
+                              Icon(Icons.school_outlined, color: primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                existing == null ? 'Add Education' : 'Edit Education',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                              ),
+                            ],
+                          ),
+                          TextButton.icon(
+                            onPressed: isAiLoading ? null : () => _fetchAiSuggestions(
+                              ctx3,
+                              institutionCtrl,
+                              degreeCtrl,
+                              fieldCtrl,
+                              achCtrl,
+                              (val) => setSheetState(() => isAiLoading = val),
+                            ),
+                            icon: isAiLoading 
+                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.auto_awesome, size: 16),
+                            label: const Text('AI Suggestions', style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(foregroundColor: primary),
                           ),
                         ],
                       ),
@@ -189,7 +312,17 @@ class _ResumeEditEducationScreenState extends State<ResumeEditEducationScreen> {
                                 ),
                                 const SizedBox(height: 12),
                               ],
-                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: achCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Achievements / Description',
+                                  prefixIcon: Icon(Icons.notes_outlined),
+                                  alignLabelWithHint: true,
+                                ),
+                                maxLines: 6,
+                                minLines: 3,
+                              ),
+                              const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 onPressed: isSaving
                                     ? null
@@ -201,6 +334,7 @@ class _ResumeEditEducationScreenState extends State<ResumeEditEducationScreen> {
                                             institution: institutionCtrl.text,
                                             degree: degreeCtrl.text,
                                             fieldOfStudy: fieldCtrl.text.isNotEmpty ? fieldCtrl.text : null,
+                                            achievements: achCtrl.text.isNotEmpty ? achCtrl.text : null,
                                             startDate: startYear ?? 0,
                                             endDate: isCurrent ? null : endYear?.toString(),
                                             isCurrent: isCurrent,

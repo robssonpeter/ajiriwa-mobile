@@ -230,7 +230,17 @@ class _ResumeEditSkillsScreenState extends State<ResumeEditSkillsScreen> {
           if (state is ResumeSectionLoaded) {
             setState(() {
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
-              _skillLevels = state.response.data['skill_levels'] as List<dynamic>? ?? [];
+              
+              // Handle skill_levels being either a Map or a List
+              final levelsData = state.response.data['skill_levels'];
+              if (levelsData is Map) {
+                _skillLevels = levelsData.entries.map((e) => {'id': int.tryParse(e.key.toString()) ?? e.key, 'name': e.value}).toList();
+              } else if (levelsData is List) {
+                _skillLevels = levelsData;
+              } else {
+                _skillLevels = [];
+              }
+
               final list = state.response.data['skills'] as List<dynamic>?;
               if (list != null) {
                 _skills = list.map((e) {

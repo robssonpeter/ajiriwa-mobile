@@ -37,6 +37,11 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
   // Currently selected template
   String _currentTemplateKey = 'material'; // Default template
 
+  // Polling for download
+  Timer? _downloadPollingTimer;
+  int _downloadTries = 0;
+  static const int _maxDownloadTries = 12;
+
   @override
   void initState() {
     super.initState();
@@ -208,6 +213,8 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
 
   /// Download the resume as a PDF
   Future<void> _downloadResume() async {
+    if (_isLoading) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -217,23 +224,17 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
               strokeWidth: 2.0,
             ),
             SizedBox(width: 16),
-            Text('Preparing download...'),
+            Text('Checking resume status...'),
           ],
         ),
-        duration: Duration(seconds: 10),
+        duration: Duration(seconds: 2),
       ),
     );
 
     try {
       final hasConnectivity = await _checkConnectivity();
       if (!hasConnectivity) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No internet connection. Please check your network settings and try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar('No internet connection. Please check your network settings.');
         return;
       }
 
@@ -241,25 +242,103 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
       final token = await apiClient.getToken();
 
       if (token == null) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Authentication token not found. Please log in again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar('Authentication token not found. Please log in again.');
         return;
       }
 
-      final uri = Uri.parse('${ApiClient.baseUrl}/my-resume/download').replace(
-        queryParameters: {
-          'template': _currentTemplateKey,
-          'format': 'pdf',
-          'paper_size': 'a4',
-          'paginate': '1', // Enable pagination for PDF
-        },
-      );
+      // 1. Check if PDF exists via /api/v1/my-resume
+      final response = await apiClient.get('/my-resume');
 
+      if (response != null && response['resume_pdf'] != null) {
+        final resumePdf = response['resume_pdf'];
+        final bool exists = resumePdf['exists'] ?? false;
+        final String? downloadUrl = resumePdf['download_url'];
+
+        if (exists && downloadUrl != null) {
+          // PDF is ready, trigger download
+          _triggerDownload(downloadUrl, token);
+        } else {
+          // PDF is not ready, start polling
+          _startDownloadPolling(token);
+        }
+      } else {
+        _showErrorSnackBar('Could not check resume status. Please try again.');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error: ${e.toString()}');
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _startDownloadPolling(String token) {
+    _downloadTries = 0;
+    _downloadPollingTimer?.cancel();
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              strokeWidth: 2.0,
+            ),
+            SizedBox(width: 16),
+            Text('Preparing your resume PDF...'),
+          ],
+        ),
+        duration: Duration(minutes: 1),
+      ),
+    );
+
+    _downloadPollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      _downloadTries++;
+      if (_downloadTries >= _maxDownloadTries) {
+        _stopPolling();
+        _showErrorSnackBar('Resume preparation is taking longer than expected. Please try again in a moment.');
+        return;
+      }
+
+      try {
+        final apiClient = sl<ApiClient>();
+        final response = await apiClient.get('/my-resume');
+
+        if (response != null && response['resume_pdf'] != null) {
+          final resumePdf = response['resume_pdf'];
+          final bool exists = resumePdf['exists'] ?? false;
+          final String? downloadUrl = resumePdf['download_url'];
+
+          if (exists && downloadUrl != null) {
+            _stopPolling();
+            _triggerDownload(downloadUrl, token);
+          }
+        }
+      } catch (e) {
+        debugPrint('Polling error: $e');
+      }
+    });
+  }
+
+  void _stopPolling() {
+    _downloadPollingTimer?.cancel();
+    _downloadPollingTimer = null;
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    }
+  }
+
+  Future<void> _triggerDownload(String url, String token) async {
+    try {
+      final uri = Uri.parse(url);
       final downloadUrl = uri.replace(
         queryParameters: {
           ...uri.queryParameters,
@@ -269,8 +348,6 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
 
       if (await canLaunchUrl(downloadUrl)) {
         await launchUrl(downloadUrl, mode: LaunchMode.externalApplication);
-
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Resume download started'),
@@ -278,23 +355,10 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not start download. Please try again later.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar('Could not start download. Please try again later.');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error downloading resume: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      debugPrint('Error downloading resume: $e');
+      _showErrorSnackBar('Error starting download: ${e.toString()}');
     }
   }
 
@@ -343,7 +407,12 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
                   // Resolve thumbnail: prefix relative paths with base URL
                   String thumb = template['thumbnail'] as String? ?? '';
                   if (thumb.isNotEmpty && !thumb.startsWith('http')) {
-                    thumb = '$_baseUrl/storage/$thumb';
+                    // Check if it starts with storage/
+                    if (thumb.startsWith('storage/')) {
+                      thumb = 'https://www.ajiriwa.net/$thumb';
+                    } else {
+                      thumb = 'https://www.ajiriwa.net/storage/$thumb';
+                    }
                   }
                   return {
                     'key': template['slug'] as String,
@@ -723,6 +792,7 @@ class _ResumeViewScreenState extends State<ResumeViewScreen> {
 
   @override
   void dispose() {
+    _downloadPollingTimer?.cancel();
     super.dispose();
   }
 }

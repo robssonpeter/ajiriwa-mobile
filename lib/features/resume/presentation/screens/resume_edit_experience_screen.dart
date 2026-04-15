@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../core/navigation/app_router.dart';
+import '../../../../../core/network/api_client.dart';
+import '../../../../../injection_container.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
@@ -32,6 +34,103 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
     });
   }
 
+  Future<void> _fetchAiSuggestions(
+    BuildContext context,
+    TextEditingController jobTitleCtrl,
+    TextEditingController companyCtrl,
+    TextEditingController descCtrl,
+    Function(bool) setLoading,
+  ) async {
+    if (_candidateId == null) return;
+
+    setLoading(true);
+
+    try {
+      final apiClient = sl<ApiClient>();
+      final response = await apiClient.post('/ai/experience/templates', data: {
+        'candidate_id': _candidateId,
+        'job_title': jobTitleCtrl.text,
+        'company': companyCtrl.text,
+        'responsibilities': descCtrl.text,
+      });
+
+      if (response != null && response is List) {
+        _showAiSuggestionsDialog(context, response, descCtrl);
+      } else if (response != null && response['error'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['error']), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch AI suggestions: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  void _showAiSuggestionsDialog(BuildContext context, List suggestions, TextEditingController descCtrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'AI Experience Suggestions',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Text(
+                'Choose a refined description for your role.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: suggestions.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final template = suggestions[index]['template'] as String;
+                    return InkWell(
+                      onTap: () {
+                        descCtrl.text = template;
+                        Navigator.pop(ctx);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          template,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showExperienceSheet(BuildContext context, {Experience? existing}) {
     final formKey = GlobalKey<FormState>();
     final jobTitleCtrl = TextEditingController(text: existing?.jobTitle ?? '');
@@ -46,6 +145,7 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
         : null;
     bool isCurrent = existing?.isCurrent ?? false;
     bool isSaving = false;
+    bool isAiLoading = false;
 
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -82,12 +182,31 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.work_outline, color: primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              existing == null ? 'Add Work Experience' : 'Edit Work Experience',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                            Row(
+                              children: [
+                                Icon(Icons.work_outline, color: primary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  existing == null ? 'Add Work Experience' : 'Edit Work Experience',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
+                                ),
+                              ],
+                            ),
+                            TextButton.icon(
+                              onPressed: isAiLoading ? null : () => _fetchAiSuggestions(
+                                ctx3,
+                                jobTitleCtrl,
+                                companyCtrl,
+                                descCtrl,
+                                (val) => setSheetState(() => isAiLoading = val),
+                              ),
+                              icon: isAiLoading 
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.auto_awesome, size: 16),
+                              label: const Text('AI Suggestions', style: TextStyle(fontSize: 12)),
+                              style: TextButton.styleFrom(foregroundColor: primary),
                             ),
                           ],
                         ),
@@ -209,7 +328,8 @@ class _ResumeEditExperienceScreenState extends State<ResumeEditExperienceScreen>
                                     prefixIcon: Icon(Icons.notes_outlined),
                                     alignLabelWithHint: true,
                                   ),
-                                  maxLines: 4,
+                                  maxLines: 6,
+                                  minLines: 3,
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton.icon(

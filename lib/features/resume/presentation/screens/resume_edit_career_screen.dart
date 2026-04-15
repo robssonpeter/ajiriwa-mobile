@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:html_editor_enhanced/html_editor.dart';
 import '../../../../../core/navigation/app_router.dart';
+import '../../../../../core/network/api_client.dart';
+import '../../../../../injection_container.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
@@ -17,10 +18,11 @@ class ResumeEditCareerScreen extends StatefulWidget {
 }
 
 class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
-  final HtmlEditorController _htmlController = HtmlEditorController();
+  final TextEditingController _objectiveController = TextEditingController();
   int? _candidateId;
   bool _isSaving = false;
-  String _currentHtml = '';
+  bool _isLoadingSuggestions = false;
+  String _currentText = '';
 
   @override
   void initState() {
@@ -30,11 +32,186 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _objectiveController.dispose();
+    super.dispose();
+  }
+
   void _save() async {
     setState(() => _isSaving = true);
-    final html = await _htmlController.getText();
-    final career = Career(careerObjective: html);
+    final text = _objectiveController.text;
+    final career = Career(careerObjective: text);
     context.read<ResumeBloc>().add(UpdateCareer(career: career, candidateId: _candidateId));
+  }
+
+  Future<void> _fetchSuggestions() async {
+    if (_candidateId == null) return;
+
+    setState(() => _isLoadingSuggestions = true);
+
+    try {
+      final apiClient = sl<ApiClient>();
+      final response = await apiClient.post('/ai/career-objective/templates', data: {
+        'candidate_id': _candidateId,
+      });
+
+      if (response != null && response is List) {
+        _showSuggestionsDialog(response);
+      } else if (response != null && response['error'] != null) {
+        _showError(response['error']);
+      }
+    } catch (e) {
+      _showError('Failed to fetch suggestions: $e');
+    } finally {
+      setState(() => _isLoadingSuggestions = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  void _showSuggestionsDialog(List suggestions) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Professional Suggestions',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Text(
+                'Choose a template to use or refine.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: suggestions.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final suggestion = suggestions[index];
+                    final template = suggestion['template'] as String;
+                    final questions = suggestion['questions'] as List?;
+
+                    return InkWell(
+                      onTap: () {
+                        if (questions == null || questions.isEmpty) {
+                          _objectiveController.text = template;
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pop(context);
+                          _showQuestionsDialog(template, questions);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          template,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showQuestionsDialog(String template, List questions) {
+    final List<TextEditingController> controllers = 
+        questions.map((q) => TextEditingController()).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Refine Suggestion'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Provide a few more details to personalize this objective:'),
+                const SizedBox(height: 16),
+                ...List.generate(questions.length, (index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextField(
+                      controller: controllers[index],
+                      decoration: InputDecoration(
+                        labelText: questions[index],
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final answers = controllers.map((c) => c.text).toList();
+                Navigator.pop(context);
+                _completeTemplate(template, answers);
+              },
+              child: const Text('Complete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _completeTemplate(String template, List<String> answers) async {
+    setState(() => _isLoadingSuggestions = true);
+    try {
+      final apiClient = sl<ApiClient>();
+      final response = await apiClient.post('/ai/career-objective/complete', data: {
+        'candidate_id': _candidateId,
+        'template': template,
+        'answers': answers,
+      });
+
+      if (response != null && response['final_template'] != null) {
+        _objectiveController.text = response['final_template'];
+      } else if (response != null && response['error'] != null) {
+        _showError(response['error']);
+      }
+    } catch (e) {
+      _showError('Failed to complete template: $e');
+    } finally {
+      setState(() => _isLoadingSuggestions = false);
+    }
   }
 
   @override
@@ -62,9 +239,9 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
             });
             final career = state.response.data['career'] as Map<String, dynamic>?;
             final objective = career?['career_objective'] as String? ?? career?['objective'] as String? ?? '';
-            setState(() => _currentHtml = objective);
-            if (objective.isNotEmpty) {
-              _htmlController.setText(objective);
+            setState(() => _currentText = objective);
+            if (objective.isNotEmpty && _objectiveController.text.isEmpty) {
+              _objectiveController.text = objective;
             }
           } else if (state is CareerUpdated) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -95,7 +272,7 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
           }
         },
         builder: (context, state) {
-          if (state is ResumeLoading && _currentHtml.isEmpty) {
+          if (state is ResumeLoading && _currentText.isEmpty) {
             return const ResumeEditSkeleton();
           }
 
@@ -116,50 +293,51 @@ class _ResumeEditCareerScreenState extends State<ResumeEditCareerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Write a compelling summary that highlights your skills, experience, and career goals. This is often the first thing employers read.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 250),
-                              child: HtmlEditor(
-                                controller: _htmlController,
-                                htmlEditorOptions: const HtmlEditorOptions(
-                                  hint: 'Write your career objective or personal summary here...',
-                                  shouldEnsureVisible: true,
-                                  autoAdjustHeight: true,
-                                  adjustHeightForKeyboard: true,
-                                ),
-                                htmlToolbarOptions: HtmlToolbarOptions(
-                                  toolbarPosition: ToolbarPosition.aboveEditor,
-                                  toolbarType: ToolbarType.nativeScrollable,
-                                  defaultToolbarButtons: [
-                                    const StyleButtons(),
-                                    const FontSettingButtons(fontSizeUnit: false),
-                                    const ListButtons(listStyles: false),
-                                    const ParagraphButtons(
-                                      textDirection: false,
-                                      lineHeight: false,
-                                      caseConverter: false,
-                                    ),
-                                  ],
-                                ),
-                                callbacks: Callbacks(
-                                  onChangeContent: (changed) {
-                                    if (changed != null) setState(() => _currentHtml = changed);
-                                  },
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Write a compelling summary that highlights your skills, experience, and career goals.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ),
+                              TextButton.icon(
+                                onPressed: _isLoadingSuggestions ? null : _fetchSuggestions,
+                                icon: _isLoadingSuggestions 
+                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.auto_awesome, size: 16),
+                                label: const Text('Get Suggestions', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(foregroundColor: primary),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _objectiveController,
+                            maxLines: 10,
+                            minLines: 8,
+                            decoration: InputDecoration(
+                              hintText: 'Write your career objective or personal summary here...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: primary, width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
                             ),
+                            style: const TextStyle(fontSize: 14),
                           ),
                         ],
                       ),

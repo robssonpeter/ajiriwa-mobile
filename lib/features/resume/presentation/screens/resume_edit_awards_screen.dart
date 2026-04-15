@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../../../core/navigation/app_router.dart';
 import '../../domain/entities/entities.dart';
@@ -41,6 +43,8 @@ class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
         : null;
     String? selectedCountry = existing?.countryId?.toUpperCase();
     int? selectedIndustryId = existing?.industryId;
+    String? pickedFilePath = existing?.filePath;
+    String? pickedFileName = pickedFilePath != null ? p.basename(pickedFilePath) : null;
     bool isSaving = false;
     final primary = Theme.of(context).colorScheme.primary;
 
@@ -187,6 +191,77 @@ class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
                                 ),
                                 maxLines: 3,
                               ),
+                              const SizedBox(height: 12),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.attach_file, size: 20, color: Colors.grey.shade600),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Attachment (Optional)',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (pickedFileName != null || existing?.attachment != null)
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.blue.shade100),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.description, size: 20, color: Colors.blue),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          pickedFileName ?? 'Current Attachment',
+                                          style: const TextStyle(fontSize: 13),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 18),
+                                        onPressed: () {
+                                          setSheetState(() {
+                                            pickedFilePath = null;
+                                            pickedFileName = null;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final result = await FilePicker.platform.pickFiles(
+                                    type: FileType.custom,
+                                    allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+                                  );
+                                  if (result != null) {
+                                    setSheetState(() {
+                                      pickedFilePath = result.files.first.path;
+                                      pickedFileName = result.files.first.name;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.upload_file),
+                                label: Text(pickedFileName == null ? 'Choose File' : 'Change File'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 45),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 onPressed: isSaving
@@ -204,6 +279,7 @@ class _ResumeEditAwardsScreenState extends State<ResumeEditAwardsScreen> {
                                             description: descCtrl.text.isNotEmpty ? descCtrl.text : null,
                                             countryId: selectedCountry?.toLowerCase(),
                                             industryId: selectedIndustryId,
+                                            filePath: pickedFilePath,
                                           );
                                           if (existing == null) {
                                             resumeBloc.add(AddAward(award: award, candidateId: _candidateId));

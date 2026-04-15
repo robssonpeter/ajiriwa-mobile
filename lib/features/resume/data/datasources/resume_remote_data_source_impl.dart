@@ -332,10 +332,20 @@ class ResumeRemoteDataSourceImpl implements ResumeRemoteDataSource {
   @override
   Future<bool> addAward(AwardModel award, {int? candidateId}) async {
     try {
-      final data = award.toJson();
-      if (candidateId != null) {
-        data['candidate_id'] = candidateId;
+      dynamic data;
+      if (award.filePath != null) {
+        data = FormData.fromMap({
+          ...award.toJson(),
+          if (candidateId != null) 'candidate_id': candidateId,
+          'attachment': await MultipartFile.fromFile(award.filePath!),
+        });
+      } else {
+        data = award.toJson();
+        if (candidateId != null) {
+          data['candidate_id'] = candidateId;
+        }
       }
+
       final response = await apiClient.post(
         '/certificates',
         data: data,
@@ -351,15 +361,32 @@ class ResumeRemoteDataSourceImpl implements ResumeRemoteDataSource {
   @override
   Future<bool> updateAward(AwardModel award, {int? candidateId}) async {
     try {
-      final data = award.toJson();
-      if (candidateId != null) {
-        data['candidate_id'] = candidateId;
+      dynamic data;
+      if (award.filePath != null) {
+        data = FormData.fromMap({
+          ...award.toJson(),
+          if (candidateId != null) 'candidate_id': candidateId,
+          '_method': 'PUT',
+          'attachment': await MultipartFile.fromFile(award.filePath!),
+        });
+        
+        // Use POST with _method=PUT for multipart updates
+        final response = await apiClient.post(
+          '/certificates/${award.id}',
+          data: data,
+        );
+        return response['success'] == true;
+      } else {
+        data = award.toJson();
+        if (candidateId != null) {
+          data['candidate_id'] = candidateId;
+        }
+        final response = await apiClient.put(
+          '/certificates/${award.id}',
+          data: data,
+        );
+        return response['success'] == true;
       }
-      final response = await apiClient.put(
-        '/certificates/${award.id}',
-        data: data,
-      );
-      return response['success'] == true;
     } on ServerException {
       rethrow;
     } catch (e) {

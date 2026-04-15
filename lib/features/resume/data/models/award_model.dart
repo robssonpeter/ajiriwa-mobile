@@ -15,6 +15,8 @@ class AwardModel extends Award {
     String? country,
     int? industryId,
     String? industry,
+    String? attachment,
+    String? filePath,
   }) : super(
           id: id,
           name: name,
@@ -27,15 +29,17 @@ class AwardModel extends Award {
           country: country,
           industryId: industryId,
           industry: industry,
+          attachment: attachment,
+          filePath: filePath,
         );
 
   /// Create a model from JSON
   factory AwardModel.fromJson(Map<String, dynamic> json) {
     return AwardModel(
       id: json['id'] as int?,
-      name: json['name'] as String,
-      issuer: json['issuer'] as String,
-      date: json['date'] as String,
+      name: json['name'] as String? ?? '',
+      issuer: json['issuer'] as String? ?? '',
+      date: json['date'] as String? ?? '',
       description: json['description'] as String?,
       categoryId: json['category_id'] as int?,
       category: json['category'] as String?,
@@ -43,6 +47,7 @@ class AwardModel extends Award {
       country: json['country'] as String?,
       industryId: json['industry_id'] as int?,
       industry: json['industry'] as String?,
+      attachment: json['attachment_url'] as String? ?? json['attachment'] as String?,
     );
   }
 
@@ -60,6 +65,7 @@ class AwardModel extends Award {
       'country': country,
       'industry_id': industryId,
       'industry': industry,
+      'attachment_url': attachment,
     };
   }
 }

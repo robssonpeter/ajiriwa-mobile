@@ -257,7 +257,17 @@ class _ResumeEditLanguageScreenState extends State<ResumeEditLanguageScreen> {
           if (state is ResumeSectionLoaded) {
             setState(() {
               _candidateId = state.response.data['candidate_id'] as int? ?? state.response.selectedCandidateId;
-              _languageLevels = state.response.data['language_levels'] as List<dynamic>? ?? [];
+
+              // Handle language_levels being either a Map or a List
+              final levelsData = state.response.data['language_levels'];
+              if (levelsData is Map) {
+                _languageLevels = levelsData.entries.map((e) => {'id': int.tryParse(e.key.toString()) ?? e.key, 'name': e.value}).toList();
+              } else if (levelsData is List) {
+                _languageLevels = levelsData;
+              } else {
+                _languageLevels = [];
+              }
+
               final list = state.response.data['languages'] as List<dynamic>?;
               if (list != null) {
                 _languages = list.map((e) {
