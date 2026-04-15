@@ -40,3 +40,13 @@ class ApplicationDetailsError extends ApplicationDetailsState {
   @override
   List<Object?> get props => [message];
 }
+
+/// Withdrawal in progress state
+class ApplicationWithdrawing extends ApplicationDetailsState {
+  const ApplicationWithdrawing();
+}
+
+/// Application withdrawn successfully
+class ApplicationWithdrawn extends ApplicationDetailsState {
+  const ApplicationWithdrawn();
+}

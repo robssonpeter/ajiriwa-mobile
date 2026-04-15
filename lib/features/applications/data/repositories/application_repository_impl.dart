@@ -59,4 +59,20 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
       return const Left(NetworkFailure('No internet connection'));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> withdrawApplication(int applicationId) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.withdrawApplication(applicationId);
+        return const Right(null);
+      } on ServerException catch (e) {
+        return Left(ServerFailure(e.message));
+      } catch (e) {
+        return const Left(ServerFailure('An unexpected error occurred'));
+      }
+    } else {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+  }
 }

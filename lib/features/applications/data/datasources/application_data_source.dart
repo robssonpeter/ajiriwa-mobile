@@ -11,4 +11,7 @@ abstract class ApplicationDataSource {
 
   /// Get application details by ID
   Future<ApplicationDetailsModel> getApplicationDetails(int applicationId);
+
+  /// Withdraw an application by ID
+  Future<void> withdrawApplication(int applicationId);
 }

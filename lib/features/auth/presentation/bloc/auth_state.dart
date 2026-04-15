@@ -55,3 +55,13 @@ class PasswordResetSent extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+/// Password changed successfully state
+class PasswordChanged extends AuthState {
+  const PasswordChanged();
+}
+
+/// Password change in progress state
+class PasswordChanging extends AuthState {
+  const PasswordChanging();
+}

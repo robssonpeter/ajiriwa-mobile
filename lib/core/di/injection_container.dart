@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 
+import '../utils/app_logger.dart';
+
 import '../../features/auth/data/datasources/auth_data_source.dart';
 import '../../features/auth/data/datasources/auth_data_source_impl.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
@@ -187,11 +189,10 @@ Future<void> init() async {
       // Try to create a NetworkInfoImpl with Connectivity
       return NetworkInfoImpl(Connectivity());
     } on MissingPluginException catch (e) {
-      print('Error initializing Connectivity: ${e.message}');
-      // Return a mock NetworkInfo instance that always returns connected
+      appLogger.w('Connectivity plugin unavailable: ${e.message}');
       return _MockNetworkInfo();
     } catch (e) {
-      print('Unexpected error initializing Connectivity: $e');
+      appLogger.e('Unexpected error initializing Connectivity', error: e);
       return _MockNetworkInfo();
     }
   });

@@ -8,6 +8,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 import 'core/di/injection_container.dart' as di;
+import 'core/utils/app_logger.dart';
 import 'core/navigation/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/bloc.dart';
@@ -36,7 +37,7 @@ void main() {
     // Catch any errors that occur during initialization
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
-      print('Flutter error: ${details.exception}');
+      appLogger.e('Flutter error', error: details.exception, stackTrace: details.stack);
     };
 
     // Set preferred orientations
@@ -61,8 +62,7 @@ void main() {
     // Run the app in the same zone as the Flutter binding initialization
     runApp(const AjiriwaApp());
   }, (error, stackTrace) {
-    print('Caught error: $error');
-    print('Stack trace: $stackTrace');
+    appLogger.e('Unhandled zone error', error: error, stackTrace: stackTrace);
   });
 }
 

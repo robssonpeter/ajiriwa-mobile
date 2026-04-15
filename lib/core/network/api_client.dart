@@ -1,10 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../error/exceptions.dart';
+import '../utils/app_logger.dart';
 
 /// API client for making HTTP requests
 class ApiClient {
@@ -22,6 +22,12 @@ class ApiClient {
 
   /// Selected candidate ID key for secure storage
   static const String candidateIdKey = 'selected_candidate_id';
+
+  // Stream that fires when a 401 Unauthorized response is received.
+  // AuthBloc subscribes to this to trigger automatic logout.
+  static final StreamController<void> _unauthorizedController =
+      StreamController<void>.broadcast();
+  static Stream<void> get unauthorizedStream => _unauthorizedController.stream;
 
   /// Constructor
   ApiClient({
@@ -56,8 +62,8 @@ class ApiClient {
         },
         onError: (error, handler) {
           if (error.response?.statusCode == 401) {
-            // Handle unauthorized error
-            // TODO: Implement token refresh or logout
+            // Broadcast unauthorized event so AuthBloc can trigger logout
+            _unauthorizedController.add(null);
           }
           return handler.next(error);
         },
@@ -68,111 +74,35 @@ class ApiClient {
   /// Make a GET request
   Future<dynamic> get(String path, {Map<String, dynamic>? queryParameters}) async {
     try {
-      // Check if the request should be skipped based on the path
-      // This is a simple check; in a real app, you might want to use a more sophisticated approach
-      if (path.contains('/apply') && queryParameters != null && queryParameters.containsKey('size')) {
-        final size = int.tryParse(queryParameters['size'].toString()) ?? 0;
-        if (size > 200000) {
-          print('Skipping request to $path because size ($size) exceeds 200000');
-          return null; // Skip the request
-        }
-      }
-
       final response = await dio.get(
         path,
         queryParameters: queryParameters,
       );
-
-      // Check if the response size exceeds 200000
-      final responseSize = _estimateResponseSize(response);
-      if (responseSize > 200000) {
-        print('Skipping response from $path because size ($responseSize) exceeds 200000');
-        return null; // Skip the response
-      }
-
       return _handleResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
-  }
-
-  /// Estimate the size of a response in bytes
-  int _estimateResponseSize(Response response) {
-    if (response.data == null) {
-      return 0;
-    }
-
-    if (response.data is String) {
-      return response.data.length;
-    }
-
-    if (response.data is Map || response.data is List) {
-      final jsonString = json.encode(response.data);
-      return jsonString.length;
-    }
-
-    return 0;
   }
 
   /// Make a POST request
   Future<dynamic> post(String path, {dynamic data, Map<String, dynamic>? headers}) async {
     try {
-      // Check if the request should be skipped based on the path and data size
-      if (path.contains('/apply') && data != null) {
-        final dataSize = _estimateDataSize(data);
-        if (dataSize > 200000) {
-          print('Skipping request to $path because data size ($dataSize) exceeds 200000');
-          return null; // Skip the request
-        }
-      }
-
       final response = await dio.post(
         path,
         data: data,
         options: headers != null ? Options(headers: headers) : null,
       );
-
-      // Check if the response size exceeds 200000
-      final responseSize = _estimateResponseSize(response);
-      if (responseSize > 200000) {
-        print('Skipping response from $path because size ($responseSize) exceeds 200000');
-        return null; // Skip the response
-      }
-
       return _handleResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
-  /// Estimate the size of request data in bytes
-  int _estimateDataSize(dynamic data) {
-    if (data == null) {
-      return 0;
-    }
-
-    if (data is String) {
-      return data.length;
-    }
-
-    if (data is Map || data is List) {
-      final jsonString = json.encode(data);
-      return jsonString.length;
-    }
-
-    return 0;
-  }
-
   /// Make a PUT request
   Future<dynamic> put(String path, {dynamic data}) async {
     try {
-      print("sending data to url $path");
-      print(data);
-      final response = await dio.put(
-        path,
-        data: data,
-      );
-      print(response);
+      appLogger.d('PUT $path', error: data);
+      final response = await dio.put(path, data: data);
       return _handleResponse(response);
     } on DioException catch (e) {
       throw _handleError(e);
@@ -191,10 +121,7 @@ class ApiClient {
 
   /// Handle response
   dynamic _handleResponse(Response? response) {
-    // If response is null, return null (skipped due to size limit)
-    if (response == null) {
-      return null;
-    }
+    if (response == null) return null;
 
     switch (response.statusCode) {
       case 200:
@@ -202,18 +129,14 @@ class ApiClient {
         return response.data;
       case 400:
       case 422:
-        // Extract error message from response body
         String errorMessage = response.statusCode == 400 ? 'Bad request' : 'Validation failed';
         if (response.data is Map) {
           if (response.data.containsKey('message')) {
             errorMessage = response.data['message'];
           }
-
-          // Check for detailed validation errors
           if (response.data.containsKey('errors') && response.data['errors'] is Map) {
             final errors = response.data['errors'] as Map;
             if (errors.isNotEmpty) {
-              // Get the first error message from the first field
               final firstField = errors.keys.first;
               final fieldErrors = errors[firstField];
               if (fieldErrors is List && fieldErrors.isNotEmpty) {
@@ -237,27 +160,10 @@ class ApiClient {
 
   /// Handle error
   Exception _handleError(DioException error) {
-    // Print detailed error information for debugging
-    print('DioException Type: ${error.type}');
-    print('DioException Message: ${error.message}');
-    print('DioException Error: ${error.error}');
-    print('DioException RequestOptions: ${error.requestOptions.uri}');
-    print('DioException RequestOptions Method: ${error.requestOptions.method}');
-    print('DioException RequestOptions Headers: ${error.requestOptions.headers}');
-    print('DioException Response: ${error.response}');
-
-    // Check if the request should be skipped based on the path
-    final path = error.requestOptions.path;
-    if (path.contains('/apply')) {
-      // Check if the response size exceeds 200000
-      if (error.response != null) {
-        final responseSize = _estimateResponseSize(error.response!);
-        if (responseSize > 200000) {
-          print('Skipping error response from $path because size ($responseSize) exceeds 200000');
-          return ServerException('Response size exceeds limit');
-        }
-      }
-    }
+    appLogger.e(
+      'HTTP ${error.requestOptions.method} ${error.requestOptions.uri}',
+      error: error.message,
+    );
 
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
@@ -267,21 +173,13 @@ class ApiClient {
       return NetworkException('No internet connection');
     } else if (error.response != null) {
       try {
-        // Try to handle the response, but catch any exceptions
         final result = _handleResponse(error.response!);
-        if (result == null) {
-          return ServerException('Response size exceeds limit');
-        }
+        if (result == null) return ServerException('Empty response');
         return ServerException('Server error');
       } catch (e) {
-        // If _handleResponse throws an exception, return a ServerException with the error message
-        if (e is ServerException) {
-          return e;
-        } else if (e is AuthException) {
-          return e;
-        } else {
-          return ServerException('Server error: ${e.toString()}');
-        }
+        if (e is ServerException) return e;
+        if (e is AuthException) return e;
+        return ServerException('Server error: ${e.toString()}');
       }
     } else {
       return ServerException('Unknown error: ${error.message}');

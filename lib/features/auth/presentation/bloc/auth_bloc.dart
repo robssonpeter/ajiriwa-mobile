@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/network/api_client.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
@@ -8,6 +11,8 @@ import 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// Auth repository
   final AuthRepository authRepository;
+
+  StreamSubscription<void>? _unauthorizedSubscription;
 
   /// Constructor
   AuthBloc({required this.authRepository}) : super(AuthInitial()) {
@@ -19,6 +24,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LogoutEvent>(_onLogout);
     on<ForgotPasswordEvent>(_onForgotPassword);
     on<SwitchCandidateEvent>(_onSwitchCandidate);
+    on<ChangePasswordEvent>(_onChangePassword);
+
+    // Listen for 401 responses from the API client and trigger logout automatically
+    _unauthorizedSubscription = ApiClient.unauthorizedStream.listen((_) {
+      if (state is Authenticated) {
+        add(LogoutEvent());
+      }
+    });
+  }
+
+  @override
+  Future<void> close() {
+    _unauthorizedSubscription?.cancel();
+    return super.close();
   }
 
   /// Handle switch candidate event
@@ -31,7 +50,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthLoading());
       final result = await authRepository.switchProfile(event.candidateId);
       result.fold(
-        (failure) => emit(Authenticated(currentState.user)), // Revert to old user on failure
+        (failure) => emit(Authenticated(currentState.user)),
         (user) => emit(Authenticated(user)),
       );
     }
@@ -138,6 +157,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     result.fold(
       (failure) => emit(AuthError(failure.toString())),
       (_) => emit(const PasswordResetSent('Password reset instructions have been sent to your email')),
+    );
+  }
+
+  /// Handle change password event
+  Future<void> _onChangePassword(
+    ChangePasswordEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const PasswordChanging());
+    final result = await authRepository.changePassword(
+      oldPassword: event.oldPassword,
+      newPassword: event.newPassword,
+    );
+    result.fold(
+      (failure) => emit(AuthError(failure.toString())),
+      (_) => emit(const PasswordChanged()),
     );
   }
 }

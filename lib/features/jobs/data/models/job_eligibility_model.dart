@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/job_eligibility.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Job eligibility model
 class JobEligibilityModel extends Equatable {
@@ -56,9 +57,9 @@ class JobEligibilityModel extends Equatable {
 
   /// Create model from JSON
   factory JobEligibilityModel.fromJson(Map<String, dynamic> json) {
-    print('JobEligibilityModel.fromJson - Raw JSON: $json');
-    print('JobEligibilityModel.fromJson - application_method: ${json['application_method']}');
-    print('JobEligibilityModel.fromJson - apply_method: ${json['apply_method']}');
+    appLogger.d('JobEligibilityModel.fromJson - Raw JSON: $json');
+    appLogger.d('JobEligibilityModel.fromJson - application_method: ${json['application_method']}');
+    appLogger.d('JobEligibilityModel.fromJson - apply_method: ${json['apply_method']}');
 
     return JobEligibilityModel(
       eligible: json['eligible'] ?? false,

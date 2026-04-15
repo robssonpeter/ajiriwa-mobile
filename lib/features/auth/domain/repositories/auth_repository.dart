@@ -40,4 +40,10 @@ abstract class AuthRepository {
   Future<Either<Failure, void>> forgotPassword({
     required String email,
   });
+
+  /// Change the authenticated user's password
+  Future<Either<Failure, void>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  });
 }

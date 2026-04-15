@@ -37,4 +37,10 @@ abstract class AuthDataSource {
   Future<void> forgotPassword({
     required String email,
   });
+
+  /// Change the authenticated user's password
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  });
 }

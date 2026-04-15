@@ -35,9 +35,23 @@ class SavedJobsBloc extends Bloc<SavedJobsEvent, SavedJobsState> {
     RemoveFromSavedJobsEvent event,
     Emitter<SavedJobsState> emit,
   ) async {
-    // TODO: Implement remove from saved jobs functionality
-    // This would require adding a method to the JobRepository
-    // For now, just reload the saved jobs
-    add(LoadSavedJobsEvent());
+    // Optimistically remove from the current list so the UI responds instantly
+    final currentState = state;
+    if (currentState is SavedJobsLoaded) {
+      final updatedJobs = currentState.savedJobs
+          .where((job) => job.id != event.jobId)
+          .toList();
+      emit(SavedJobsLoaded(savedJobs: updatedJobs));
+    }
+
+    final result = await jobRepository.unsaveJob(event.jobId);
+
+    result.fold(
+      (failure) {
+        // On failure revert by reloading from server
+        add(LoadSavedJobsEvent());
+      },
+      (_) => null,
+    );
   }
 }

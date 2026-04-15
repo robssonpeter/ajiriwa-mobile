@@ -6,6 +6,7 @@ import '../../../../core/network/api_client.dart';
 import '../../domain/entities/job_details.dart';
 import '../bloc/bloc.dart';
 import '../../../applications/presentation/screens/application_details_screen.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Apply button widget
 class ApplyButton extends StatelessWidget {
@@ -259,9 +260,9 @@ class ApplyButton extends StatelessWidget {
     final token = sl<ApiClient>().getToken();
 
     // Print job details for debugging
-    print('ApplyButton._buildApplyNowButton - Job ID: ${jobDetails.id}');
-    print('ApplyButton._buildApplyNowButton - Job Title: ${jobDetails.title}');
-    print('ApplyButton._buildApplyNowButton - Job Slug: ${jobDetails.slug}');
+    appLogger.d('ApplyButton._buildApplyNowButton - Job ID: ${jobDetails.id}');
+    appLogger.d('ApplyButton._buildApplyNowButton - Job Title: ${jobDetails.title}');
+    appLogger.d('ApplyButton._buildApplyNowButton - Job Slug: ${jobDetails.slug}');
 
     return SizedBox(
       width: double.infinity,
@@ -280,7 +281,7 @@ class ApplyButton extends StatelessWidget {
 
           // Validate job ID
           if (jobDetails.id <= 0) {
-            print('ApplyButton._buildApplyNowButton - Invalid job ID: ${jobDetails.id}');
+            appLogger.d('ApplyButton._buildApplyNowButton - Invalid job ID: ${jobDetails.id}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Invalid job ID: ${jobDetails.id}'),
@@ -290,7 +291,7 @@ class ApplyButton extends StatelessWidget {
             return;
           }
 
-          print('ApplyButton._buildApplyNowButton - Checking eligibility for job ID: ${jobDetails.id}');
+          appLogger.d('ApplyButton._buildApplyNowButton - Checking eligibility for job ID: ${jobDetails.id}');
 
           // Get the ApplyBloc
           final applyBloc = context.read<ApplyBloc>();

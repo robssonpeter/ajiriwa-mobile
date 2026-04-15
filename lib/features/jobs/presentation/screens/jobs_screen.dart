@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../../core/navigation/app_router.dart';
 import '../../domain/entities/job_listing.dart';
 import '../bloc/bloc.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Jobs screen - allows users to browse and search for jobs
 class JobsScreen extends StatefulWidget {
@@ -558,7 +559,7 @@ class _JobsScreenState extends State<JobsScreen> {
             fit: BoxFit.cover,
             onError: (exception, stackTrace) {
               // Handle image loading errors
-              print('Error loading company logo: $exception');
+              appLogger.d('Error loading company logo: $exception');
             },
           ),
         ),

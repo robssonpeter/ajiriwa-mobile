@@ -14,6 +14,7 @@ class ApplicationDetailsBloc extends Bloc<ApplicationDetailsEvent, ApplicationDe
     required this.applicationRepository,
   }) : super(ApplicationDetailsInitial()) {
     on<LoadApplicationDetailsEvent>(_onLoadApplicationDetails);
+    on<WithdrawApplicationEvent>(_onWithdrawApplication);
   }
 
   /// Handle load application details event
@@ -28,6 +29,21 @@ class ApplicationDetailsBloc extends Bloc<ApplicationDetailsEvent, ApplicationDe
     result.fold(
       (failure) => emit(ApplicationDetailsError(failure.message)),
       (applicationDetails) => emit(ApplicationDetailsLoaded(applicationDetails)),
+    );
+  }
+
+  /// Handle withdraw application event
+  Future<void> _onWithdrawApplication(
+    WithdrawApplicationEvent event,
+    Emitter<ApplicationDetailsState> emit,
+  ) async {
+    emit(const ApplicationWithdrawing());
+
+    final result = await applicationRepository.withdrawApplication(event.applicationId);
+
+    result.fold(
+      (failure) => emit(ApplicationDetailsError(failure.message)),
+      (_) => emit(const ApplicationWithdrawn()),
     );
   }
 }

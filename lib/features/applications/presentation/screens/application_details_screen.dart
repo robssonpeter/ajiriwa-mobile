@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../jobs/domain/entities/job_details.dart';
-import '../../../jobs/presentation/bloc/bloc.dart';
 import '../../domain/entities/application_details.dart';
 import '../bloc/application_details_bloc.dart';
 import '../bloc/application_details_event.dart';
@@ -38,36 +38,25 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<ApplyBloc>(
-          create: (_) => sl<ApplyBloc>(),
-        ),
-        BlocProvider<ApplicationDetailsBloc>(
-          create: (_) {
-            final bloc = sl<ApplicationDetailsBloc>();
-            if (widget.applicationId != null) {
-              bloc.add(LoadApplicationDetailsEvent(widget.applicationId!));
-            }
-            return bloc;
-          },
-        ),
-      ],
-      child: BlocConsumer<ApplyBloc, ApplyState>(
+    return BlocProvider<ApplicationDetailsBloc>(
+      create: (_) {
+        final bloc = sl<ApplicationDetailsBloc>();
+        if (widget.applicationId != null) {
+          bloc.add(LoadApplicationDetailsEvent(widget.applicationId!));
+        }
+        return bloc;
+      },
+      child: BlocConsumer<ApplicationDetailsBloc, ApplicationDetailsState>(
         listener: (context, state) {
-          // Handle state changes
-          if (state is ApplySuccess) {
-            // Application withdrawn successfully
+          if (state is ApplicationWithdrawn) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Application withdrawn successfully'),
                 backgroundColor: Colors.green,
               ),
             );
-            // Navigate back to job details
             Navigator.of(context).pop();
-          } else if (state is ApplyFailure) {
-            // Show error message
+          } else if (state is ApplicationDetailsError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Error: ${state.message}'),
@@ -76,25 +65,23 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
             );
           }
         },
-        builder: (context, applyState) {
-          return BlocBuilder<ApplicationDetailsBloc, ApplicationDetailsState>(
-            builder: (context, state) {
-              return Scaffold(
-                appBar: AppBar(
-                  title: const Text('Application Details'),
-                ),
-                body: _buildContent(context, state, applyState),
-              );
-            },
+        builder: (context, state) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Application Details'),
+            ),
+            body: _buildContent(context, state),
           );
         },
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, ApplicationDetailsState state, ApplyState applyState) {
+  Widget _buildContent(BuildContext context, ApplicationDetailsState state) {
     if (state is ApplicationDetailsInitial || state is ApplicationDetailsLoading) {
       return _buildSkeletonLoader();
+    } else if (state is ApplicationWithdrawing) {
+      return const Center(child: CircularProgressIndicator());
     } else if (state is ApplicationDetailsError) {
       return Center(
         child: Column(
@@ -120,14 +107,15 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
         ),
       );
     } else if (state is ApplicationDetailsLoaded) {
-      return _buildBody(context, state.applicationDetails, applyState);
+      return _buildBody(context, state.applicationDetails);
     }
 
     // Fallback
     return const Center(child: Text('Something went wrong'));
   }
 
-  Widget _buildBody(BuildContext context, ApplicationDetails applicationDetails, ApplyState state) {
+  Widget _buildBody(BuildContext context, ApplicationDetails applicationDetails) {
+    final state = context.watch<ApplicationDetailsBloc>().state;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -362,14 +350,14 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
               width: double.infinity,
               height: 56.0,
               child: ElevatedButton(
-                onPressed: state is ApplySubmitting
+                onPressed: state is ApplicationWithdrawing
                     ? null
                     : () => _showWithdrawConfirmation(context, applicationDetails.id),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   backgroundColor: Colors.red,
                 ),
-                child: state is ApplySubmitting
+                child: state is ApplicationWithdrawing
                     ? const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -422,14 +410,16 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
         subtitle: Text('${attachment.institution} • Completed ${attachment.completionDate}'),
         trailing: IconButton(
           icon: const Icon(Icons.download, color: Colors.blue),
-          onPressed: () {
-            // Open the attachment URL in a browser or download it
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Opening ${attachment.name}...'),
-              ),
-            );
-            // TODO: Implement opening the URL or downloading the file
+          onPressed: () async {
+            final url = Uri.tryParse(attachment.mediaUrl);
+            final canOpen = url != null && await canLaunchUrl(url);
+            if (canOpen) {
+              await launchUrl(url!, mode: LaunchMode.externalApplication);
+            } else if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cannot open ${attachment.name}')),
+              );
+            }
           },
         ),
       );
@@ -556,10 +546,7 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
         backgroundColor: Colors.white,
         radius: 24,
         backgroundImage: NetworkImage(logoUrl),
-        onBackgroundImageError: (exception, stackTrace) {
-          // Handle image loading errors
-          print('Error loading company logo: $exception');
-        },
+        onBackgroundImageError: (exception, stackTrace) {},
       );
     }
   }
@@ -639,13 +626,8 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // TODO: Implement withdrawal functionality using the applicationId
-              // For now, just show a success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Withdrawing application #$applicationId will be implemented in the future'),
-                  backgroundColor: Colors.orange,
-                ),
+              context.read<ApplicationDetailsBloc>().add(
+                WithdrawApplicationEvent(applicationId),
               );
             },
             child: const Text(

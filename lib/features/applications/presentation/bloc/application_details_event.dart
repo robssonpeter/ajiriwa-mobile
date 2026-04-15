@@ -20,3 +20,15 @@ class LoadApplicationDetailsEvent extends ApplicationDetailsEvent {
   @override
   List<Object?> get props => [applicationId];
 }
+
+/// Event to withdraw an application
+class WithdrawApplicationEvent extends ApplicationDetailsEvent {
+  /// Application ID
+  final int applicationId;
+
+  /// Constructor
+  const WithdrawApplicationEvent(this.applicationId);
+
+  @override
+  List<Object?> get props => [applicationId];
+}

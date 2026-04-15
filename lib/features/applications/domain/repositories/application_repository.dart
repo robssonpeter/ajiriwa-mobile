@@ -14,4 +14,7 @@ abstract class ApplicationRepository {
 
   /// Get application details by ID
   Future<Either<Failure, ApplicationDetails>> getApplicationDetails(int applicationId);
+
+  /// Withdraw an application by ID
+  Future<Either<Failure, void>> withdrawApplication(int applicationId);
 }

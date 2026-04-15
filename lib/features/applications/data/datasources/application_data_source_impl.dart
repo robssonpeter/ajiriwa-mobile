@@ -1,5 +1,6 @@
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../models/applications_response_model.dart';
 import '../models/application_details_model.dart';
 import 'application_data_source.dart';
@@ -41,8 +42,7 @@ class ApplicationDataSourceImpl implements ApplicationDataSource {
 
       return ApplicationsResponseModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Applications Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Applications Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -56,19 +56,31 @@ class ApplicationDataSourceImpl implements ApplicationDataSource {
     try {
       final response = await apiClient.get('/applications/$applicationId');
 
-      // Check if the response is null (skipped due to size limit)
       if (response == null) {
-        throw ServerException('Response size exceeds limit');
+        throw ServerException('Empty response from server');
       }
 
       return ApplicationDetailsModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Application Details Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Application Details Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
         throw ServerException('Failed to load application details. Original error: ${e.runtimeType}');
+      }
+    }
+  }
+
+  @override
+  Future<void> withdrawApplication(int applicationId) async {
+    try {
+      await apiClient.post('/applications/$applicationId/withdraw');
+    } catch (e, stackTrace) {
+      appLogger.e('Withdraw Application Error', error: e, stackTrace: stackTrace);
+      if (e is ServerException) {
+        throw e;
+      } else {
+        throw ServerException('Failed to withdraw application');
       }
     }
   }

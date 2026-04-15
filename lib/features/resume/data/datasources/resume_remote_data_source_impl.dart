@@ -4,6 +4,7 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/api_client.dart';
 import '../models/models.dart';
 import 'resume_remote_data_source.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Implementation of [ResumeRemoteDataSource]
 class ResumeRemoteDataSourceImpl implements ResumeRemoteDataSource {
@@ -60,14 +61,14 @@ class ResumeRemoteDataSourceImpl implements ResumeRemoteDataSource {
         '/my-resume/edit/${section == 'personal' ? '' : section}',
         queryParameters: queryParams,
       );
-      print("you are now on section $section");
+      appLogger.d("you are now on section $section");
       //print(response);
       return ResumeSectionResponseModel.fromJson(response);
     /*} on ServerException {
       rethrow;
     } catch (e) {
-      print(e.toString());
-      print(e);
+      appLogger.d(e.toString());
+      appLogger.d(e);
       throw ServerException(e.toString());
     }*/
   }

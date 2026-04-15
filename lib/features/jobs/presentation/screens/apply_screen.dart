@@ -8,6 +8,7 @@ import '../../domain/entities/job_apply_context.dart';
 import '../../domain/entities/job_details.dart';
 import '../../domain/entities/job_screening.dart';
 import '../bloc/bloc.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Apply screen - allows users to apply for a job
 class ApplyScreen extends StatefulWidget {
@@ -60,7 +61,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
   }
 
   void _initializeScreeningAnswers() {
-    print(widget.screening);
+    appLogger.d(widget.screening);
     if (widget.screening != null) {
       for (final question in widget.screening!.questions) {
         final answerMap = {

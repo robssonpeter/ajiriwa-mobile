@@ -255,4 +255,27 @@ class AuthDataSourceImpl implements AuthDataSource {
       }
     }
   }
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await apiClient.put(
+        '/profile/password',
+        data: {
+          'current_password': oldPassword,
+          'password': newPassword,
+          'password_confirmation': newPassword,
+        },
+      );
+    } catch (e) {
+      if (e is ServerException) {
+        throw e;
+      } else {
+        throw ServerException('Password change failed');
+      }
+    }
+  }
 }

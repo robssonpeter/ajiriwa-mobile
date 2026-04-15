@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/utils/app_logger.dart';
 import '../../domain/repositories/job_repository.dart';
 import 'apply_event.dart';
 import 'apply_state.dart';
@@ -53,67 +54,42 @@ class ApplyBloc extends Bloc<ApplyEvent, ApplyState> {
     ApplyEligibilityRequested event,
     Emitter<ApplyState> emit,
   ) async {
-    print('ApplyBloc._onApplyEligibilityRequested called with jobId: ${event.jobId}, candidateId: ${event.candidateId}');
     emit(ApplyCheckingEligibility());
     try {
-      print('Calling jobRepository.checkJobEligibility');
       final result = await jobRepository.checkJobEligibility(event.jobId, candidateId: event.candidateId);
-      print('Result from jobRepository.checkJobEligibility: $result');
       result.fold(
-        (failure) {
-          print('Failure from jobRepository.checkJobEligibility: $failure');
-          print('Failure type: ${failure.runtimeType}');
-          print('Failure message: ${failure.toString()}');
-          emit(ApplyFailure(message: failure.toString()));
-        },
+        (failure) => emit(ApplyFailure(message: failure.toString())),
         (eligibility) {
-          print('Eligibility from jobRepository.checkJobEligibility: $eligibility');
-          print('Eligible: ${eligibility.eligible}');
-          print('Has external URL: ${eligibility.hasExternalUrl}');
-          print('Has instruction in description: ${eligibility.hasInstructionInDescription}');
-
           emit(ApplyEligibilityReady(
             eligible: eligibility.eligible,
             details: eligibility,
           ));
 
-          // If eligible, determine the next flow based on application method
           if (eligibility.eligible) {
-            // Check if screening is required
             if (eligibility.screeningRequired) {
-              print('Screening required, loading screening questions for job ID: ${event.jobId}');
-              // Load screening questions first
               add(ApplyScreeningLoaded(event.jobId));
             } else {
-              // No screening required, proceed with normal flow
               switch (eligibility.applicationMethod) {
                 case 'url':
-                  print('Emitting ApplyFlowRequired with mode: external_url');
                   emit(ApplyFlowRequired(mode: 'external_url'));
                   break;
                 case 'description':
-                  print('Emitting ApplyFlowRequired with mode: instructions');
                   emit(ApplyFlowRequired(mode: 'instructions'));
                   break;
                 case 'email':
-                  print('Emitting ApplyFlowRequired with mode: email');
                   emit(ApplyFlowRequired(mode: 'email'));
                   break;
                 case 'ajiriwa':
                 default:
-                  print('Emitting ApplyFlowRequired with mode: ajiriwa');
                   emit(ApplyFlowRequired(mode: 'ajiriwa'));
                   break;
               }
             }
-          } else {
-            print('Not eligible to apply');
           }
         },
       );
     } catch (e) {
-      print('Unexpected error in ApplyBloc._onApplyEligibilityRequested: $e');
-      print('Error type: ${e.runtimeType}');
+      appLogger.e('ApplyBloc eligibility check failed', error: e);
       emit(ApplyFailure(message: 'An unexpected error occurred: ${e.toString()}'));
     }
   }

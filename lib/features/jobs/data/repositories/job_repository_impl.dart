@@ -81,24 +81,16 @@ class JobRepositoryImpl implements JobRepository {
 
   @override
   Future<Either<Failure, JobEligibility>> checkJobEligibility(int jobId, {int? candidateId}) async {
-    print('JobRepositoryImpl.checkJobEligibility called with jobId: $jobId, candidateId: $candidateId');
     if (await networkInfo.isConnected) {
       try {
-        print('Network is connected, calling remoteDataSource.checkJobEligibility');
         final eligibilityModel = await remoteDataSource.checkJobEligibility(jobId, candidateId: candidateId);
-        print('Eligibility model received: $eligibilityModel');
         return Right(eligibilityModel.toEntity());
       } on ServerException catch (e) {
-        print('ServerException caught in JobRepositoryImpl.checkJobEligibility: $e');
-        print('ServerException message: ${e.message}');
         return Left(ServerFailure(e.message));
       } catch (e) {
-        print('Unexpected error caught in JobRepositoryImpl.checkJobEligibility: $e');
-        print('Error type: ${e.runtimeType}');
         return Left(ServerFailure('An unexpected error occurred: ${e.toString()}'));
       }
     } else {
-      print('Network is not connected');
       return const Left(NetworkFailure('No internet connection'));
     }
   }
@@ -155,8 +147,6 @@ class JobRepositoryImpl implements JobRepository {
           coverLetter: coverLetter,
           attachments: attachmentModels,
         );
-
-        print(screeningAnswerModels);
 
         // Call the data source
         final responseModel = await remoteDataSource.applyForJob(jobId, requestModel, candidateId: candidateId);

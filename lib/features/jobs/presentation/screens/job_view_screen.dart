@@ -17,6 +17,7 @@ import '../bloc/bloc.dart';
 import '../widgets/apply_button.dart';
 import 'apply_screen.dart';
 import 'web_view_screen.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// Job view screen - displays job details
 class JobViewScreen extends StatelessWidget {
@@ -105,7 +106,7 @@ class JobViewScreen extends StatelessWidget {
     if (state is JobLoading) {
       return _buildSkeletonJobDetails(context);
     } else if (state is JobLoaded) {
-      print(state);
+      appLogger.d(state);
       return _buildJobDetails(context, state.jobDetails);
     } else if (state is JobError) {
       return Center(
@@ -558,7 +559,7 @@ class JobViewScreen extends StatelessWidget {
         backgroundImage: NetworkImage(logoUrl),
         onBackgroundImageError: (exception, stackTrace) {
           // Handle image loading errors
-          print('Error loading company logo: $exception');
+          appLogger.d('Error loading company logo: $exception');
         },
       );
     }
@@ -579,23 +580,23 @@ class JobViewScreen extends StatelessWidget {
         throw Exception('Could not launch $url');
       }
     } catch (e) {
-      print('Error launching URL: $e');
+      appLogger.d('Error launching URL: $e');
       // Show a snackbar or dialog to inform the user that the URL could not be launched
     }
   }
 
   /// Handle different apply flows based on the state
   void _handleApplyFlow(BuildContext context, ApplyFlowRequired state) {
-    print('_handleApplyFlow called with state mode: ${state.mode}');
+    appLogger.d('_handleApplyFlow called with state mode: ${state.mode}');
 
     final jobId = context.read<JobBloc>().state is JobLoaded
         ? (context.read<JobBloc>().state as JobLoaded).jobDetails.id
         : 0;
 
-    print('JobId: $jobId');
+    appLogger.d('JobId: $jobId');
 
     if (jobId == 0) {
-      print('Error: Job details not loaded');
+      appLogger.d('Error: Job details not loaded');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Error: Job details not loaded'),
@@ -605,28 +606,28 @@ class JobViewScreen extends StatelessWidget {
       return;
     }
 
-    print("the state variable is right below here");
-    print(state);
+    appLogger.d("the state variable is right below here");
+    appLogger.d(state);
 
     switch (state.mode) {
       case 'ajiriwa':
-        print('Calling _showAjiriwaApplyFlow');
+        appLogger.d('Calling _showAjiriwaApplyFlow');
         _showAjiriwaApplyFlow(context, jobId, state.screening);
         break;
       case 'external_url':
-        print('Calling _showExternalUrlApplyFlow');
+        appLogger.d('Calling _showExternalUrlApplyFlow');
         _showExternalUrlApplyFlow(context, jobId);
         break;
       case 'instructions':
-        print('Calling _showInstructionsApplyFlow');
+        appLogger.d('Calling _showInstructionsApplyFlow');
         _showInstructionsApplyFlow(context, jobId);
         break;
       case 'email':
-        print('Calling _showEmailApplyFlow');
+        appLogger.d('Calling _showEmailApplyFlow');
         _showEmailApplyFlow(context, jobId);
         break;
       default:
-        print('Unknown apply mode: ${state.mode}');
+        appLogger.d('Unknown apply mode: ${state.mode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Unknown apply mode: ${state.mode}'),
@@ -683,18 +684,18 @@ class JobViewScreen extends StatelessWidget {
 
   /// Show external URL application flow
   void _showExternalUrlApplyFlow(BuildContext context, int jobId) {
-    print('_showExternalUrlApplyFlow called with jobId: $jobId');
+    appLogger.d('_showExternalUrlApplyFlow called with jobId: $jobId');
 
     final jobDetails = context.read<JobBloc>().state is JobLoaded
         ? (context.read<JobBloc>().state as JobLoaded).jobDetails
         : null;
 
-    print('JobDetails: $jobDetails');
-    print('ApplicationUrl: ${jobDetails?.applicationUrl}');
-    print('ApplyMethod: ${jobDetails?.applyMethod}');
+    appLogger.d('JobDetails: $jobDetails');
+    appLogger.d('ApplicationUrl: ${jobDetails?.applicationUrl}');
+    appLogger.d('ApplyMethod: ${jobDetails?.applyMethod}');
 
     if (jobDetails == null || jobDetails.applicationUrl == null) {
-      print('Error: Application URL not available');
+      appLogger.d('Error: Application URL not available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Error: Application URL not available'),
@@ -715,11 +716,11 @@ class JobViewScreen extends StatelessWidget {
     }
 
     // Record external click before opening URL
-    print('Recording external click');
+    appLogger.d('Recording external click');
     applyBloc.add(ApplyExternalClickRecorded(jobId, candidateId: selectedCandidateId));
 
     // Record apply intent and navigate directly to WebViewScreen
-    print('Recording apply intent');
+    appLogger.d('Recording apply intent');
     applyBloc.add(
       ApplyExternalIntentRecorded(
         jobId: jobId,
@@ -730,7 +731,7 @@ class JobViewScreen extends StatelessWidget {
 
     // Navigate to WebViewScreen with jobId
     // We'll pass the applicationId as null for now, and the WebViewScreen will handle it
-    print('Navigating to WebViewScreen with URL: ${jobDetails.applicationUrl!}');
+    appLogger.d('Navigating to WebViewScreen with URL: ${jobDetails.applicationUrl!}');
     try {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -745,9 +746,9 @@ class JobViewScreen extends StatelessWidget {
           ),
         ),
       );
-      print('Navigation to WebViewScreen completed');
+      appLogger.d('Navigation to WebViewScreen completed');
     } catch (e) {
-      print('Error navigating to WebViewScreen: $e');
+      appLogger.d('Error navigating to WebViewScreen: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),

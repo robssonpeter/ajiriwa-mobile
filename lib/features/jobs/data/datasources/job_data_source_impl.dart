@@ -1,5 +1,6 @@
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/app_logger.dart';
 import '../models/job_apply_context_model.dart';
 import '../models/job_apply_request_model.dart';
 import '../models/job_apply_response_model.dart';
@@ -31,8 +32,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobDetailsModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Details Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Details Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -105,8 +105,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobsResponseModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Jobs Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Jobs Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -123,7 +122,6 @@ class JobDataSourceImpl implements JobDataSource {
         throw ServerException('Invalid job ID: $jobId');
       }
 
-      print('Checking job eligibility for job ID: $jobId, candidateId: $candidateId');
 
       // Build query parameters if candidateId is provided
       final queryParameters = <String, dynamic>{};
@@ -135,7 +133,6 @@ class JobDataSourceImpl implements JobDataSource {
         '/jobs/$jobId/apply/eligibility', 
         queryParameters: queryParameters.isNotEmpty ? queryParameters : null
       );
-      print('Job eligibility response: $response');
 
       // Check if the response is null (skipped due to size limit)
       if (response == null) {
@@ -144,17 +141,13 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobEligibilityModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Eligibility Data Source Error: $e');
-      print('Error Type: ${e.runtimeType}');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Eligibility Data Source Error', error: e, stackTrace: stackTrace);
 
       // Try to get more information about the error
       if (e is ServerException) {
-        print('Server Exception Message: ${e.message}');
-        throw e;
+          throw e;
       } else {
-        print('Unknown Error: $e');
-        throw ServerException('Failed to check job eligibility: ${e.toString()}');
+          throw ServerException('Failed to check job eligibility: ${e.toString()}');
       }
     }
   }
@@ -171,8 +164,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobScreeningModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Screening Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Screening Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -199,8 +191,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobApplyResponseModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Apply Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Apply Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -227,8 +218,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobApplyIntentResponseModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Apply Intent Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Apply Intent Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -242,8 +232,7 @@ class JobDataSourceImpl implements JobDataSource {
     try {
       await apiClient.post('/applications/$applicationId/mark-applied');
     } catch (e, stackTrace) {
-      print('Mark External Application Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Mark External Application Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -260,8 +249,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       await apiClient.post('/jobs/$jobId/apply/external-click', data: data);
     } catch (e, stackTrace) {
-      print('Record External Click Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Record External Click Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -273,7 +261,6 @@ class JobDataSourceImpl implements JobDataSource {
   @override
   Future<JobApplyContextModel> getApplyContextBySlug(String slug, {int? candidateId}) async {
     try {
-      print("fetching application information using $slug, candidateId: $candidateId");
 
       // Build query parameters if candidateId is provided
       final queryParameters = <String, dynamic>{};
@@ -293,8 +280,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return JobApplyContextModel.fromJson(response);
     } catch (e, stackTrace) {
-      print('Job Apply Context Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Job Apply Context Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -319,8 +305,7 @@ class JobDataSourceImpl implements JobDataSource {
       // Convert each job object to a JobDetailsModel
       return jobsJson.map((job) => JobDetailsModel.fromJson(job as Map<String, dynamic>)).toList();
     } catch (e, stackTrace) {
-      print('Saved Jobs Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Saved Jobs Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -332,11 +317,9 @@ class JobDataSourceImpl implements JobDataSource {
   @override
   Future<void> saveJob(int jobId) async {
     try {
-      print('Saving job with ID: $jobId');
       await apiClient.post('/jobs/$jobId/save');
     } catch (e, stackTrace) {
-      print('Save Job Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Save Job Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -348,11 +331,9 @@ class JobDataSourceImpl implements JobDataSource {
   @override
   Future<void> unsaveJob(int jobId) async {
     try {
-      print('Unsaving job with ID: $jobId');
       await apiClient.delete('/jobs/$jobId/save');
     } catch (e, stackTrace) {
-      print('Unsave Job Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Unsave Job Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -364,7 +345,6 @@ class JobDataSourceImpl implements JobDataSource {
   @override
   Future<Map<String, dynamic>> getCandidates() async {
     try {
-      print('Getting candidates list');
       final response = await apiClient.get('/api/v1/candidates');
 
       // Check if the response is null (skipped due to size limit)
@@ -374,8 +354,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return response as Map<String, dynamic>;
     } catch (e, stackTrace) {
-      print('Get Candidates Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Get Candidates Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -387,7 +366,6 @@ class JobDataSourceImpl implements JobDataSource {
   @override
   Future<Map<String, dynamic>> createCandidate(String professionalTitle) async {
     try {
-      print('Creating new candidate with professional title: $professionalTitle');
       final response = await apiClient.post('/api/v1/candidates', data: {
         'professional_title': professionalTitle,
       });
@@ -399,8 +377,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return response as Map<String, dynamic>;
     } catch (e, stackTrace) {
-      print('Create Candidate Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Create Candidate Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {
@@ -430,8 +407,7 @@ class JobDataSourceImpl implements JobDataSource {
 
       return response as Map<String, dynamic>;
     } catch (e, stackTrace) {
-      print('Generate Cover Letter Data Source Error: $e');
-      print('Stack Trace: $stackTrace');
+      appLogger.e('Generate Cover Letter Data Source Error', error: e, stackTrace: stackTrace);
       if (e is ServerException) {
         throw e;
       } else {

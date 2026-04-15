@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../bloc/bloc.dart';
+import '../../../../core/utils/app_logger.dart';
 
 /// WebView screen to display external URLs within the app
 class WebViewScreen extends StatefulWidget {
@@ -42,10 +43,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
   @override
   void initState() {
     super.initState();
-    print('WebViewScreen.initState called');
-    print('URL to load: ${widget.url}');
-    print('JobId: ${widget.jobId}');
-    print('ApplicationId: ${widget.applicationId}');
+    appLogger.d('WebViewScreen.initState called');
+    appLogger.d('URL to load: ${widget.url}');
+    appLogger.d('JobId: ${widget.jobId}');
+    appLogger.d('ApplicationId: ${widget.applicationId}');
 
     // Initialize WebView controller with a simpler approach
     _controller = WebViewController()
@@ -54,10 +55,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            print('WebView loading progress: $progress%');
+            appLogger.d('WebView loading progress: $progress%');
           },
           onPageStarted: (String url) {
-            print('WebView onPageStarted: $url');
+            appLogger.d('WebView onPageStarted: $url');
             if (mounted) {
               setState(() {
                 _isLoading = true;
@@ -67,7 +68,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
           },
           onPageFinished: (String url) {
-            print('WebView onPageFinished: $url');
+            appLogger.d('WebView onPageFinished: $url');
             if (mounted) {
               setState(() {
                 _isLoading = false;
@@ -75,9 +76,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
           },
           onWebResourceError: (WebResourceError error) {
-            print('WebView error: ${error.description}');
-            print('WebView error code: ${error.errorCode}');
-            print('WebView error type: ${error.errorType}');
+            appLogger.d('WebView error: ${error.description}');
+            appLogger.d('WebView error code: ${error.errorCode}');
+            appLogger.d('WebView error type: ${error.errorType}');
 
             if (mounted) {
               setState(() {
@@ -105,7 +106,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     if (_applicationId == null && widget.jobId != null) {
       context.read<ApplyBloc>().stream.listen((state) {
         if (state is ApplyExternalIntentRecordedState && state.response.applicationId != null) {
-          print('Received ApplyExternalIntentRecordedState with applicationId: ${state.response.applicationId}');
+          appLogger.d('Received ApplyExternalIntentRecordedState with applicationId: ${state.response.applicationId}');
           setState(() {
             _applicationId = state.response.applicationId;
           });
@@ -140,7 +141,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
-                print('Refreshing WebView');
+                appLogger.d('Refreshing WebView');
                 setState(() {
                   _isLoading = true;
                   _hasError = false;
@@ -178,7 +179,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
-                          print('Retrying WebView initialization');
+                          appLogger.d('Retrying WebView initialization');
                           setState(() {
                             _isLoading = true;
                             _hasError = false;
