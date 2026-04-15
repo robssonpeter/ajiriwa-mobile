@@ -64,7 +64,6 @@ dependencies:
   google_fonts: ^6.1.0
   #flutter_html: ^3.0.0
   flutter_html: ^3.0.0-beta.2
-  html_editor_enhanced: ^2.5.1
 
   # Logging
   logger: ^2.4.0
