@@ -20,6 +20,9 @@ class Education extends Equatable {
   /// End date (null if current education)
   final String? endDate;
 
+  /// Achievements
+  final String? achievements;
+
   /// Is current education
   final bool isCurrent;
 
@@ -43,6 +46,7 @@ class Education extends Equatable {
     this.fieldOfStudy,
     required this.startDate,
     this.endDate,
+    this.achievements,
     required this.isCurrent,
     this.description,
     this.educationLevelId,
@@ -58,6 +62,7 @@ class Education extends Equatable {
         fieldOfStudy,
         startDate,
         endDate,
+        achievements,
         isCurrent,
         description,
         educationLevelId,

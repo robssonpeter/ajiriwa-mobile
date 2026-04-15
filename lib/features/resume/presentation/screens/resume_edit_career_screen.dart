@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/navigation/app_router.dart';
 import '../../../../../core/network/api_client.dart';
-import '../../../../../injection_container.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../domain/entities/entities.dart';
 import '../bloc/bloc.dart';
 import '../widgets/resume_edit_navigation_widget.dart';
