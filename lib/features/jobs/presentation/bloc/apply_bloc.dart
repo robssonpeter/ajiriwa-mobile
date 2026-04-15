@@ -42,7 +42,7 @@ class ApplyBloc extends Bloc<ApplyEvent, ApplyState> {
     result.fold(
       (failure) => emit(CoverLetterGenerationFailure(failure.toString())),
       (response) {
-        final content = response['content'] as String;
+        final content = response['content'] as String? ?? '';
         final status = response['status'] as String? ?? 'new';
         emit(CoverLetterGenerationSuccess(content: content, status: status));
       },
