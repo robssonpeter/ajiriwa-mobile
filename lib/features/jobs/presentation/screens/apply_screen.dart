@@ -9,6 +9,7 @@ import '../../domain/entities/job_details.dart';
 import '../../domain/entities/job_screening.dart';
 import '../bloc/bloc.dart';
 import '../../../../core/utils/app_logger.dart';
+import 'pre_apply_analysis_screen.dart';
 
 /// Apply screen - allows users to apply for a job
 class ApplyScreen extends StatefulWidget {
@@ -840,23 +841,73 @@ class _ApplyScreenState extends State<ApplyScreen> {
   }
 
   Widget _buildBottomBar(BuildContext context, ApplyState state) {
+    final isSubmitting = state is ApplySubmitting;
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56.0,
-        child: ElevatedButton(
-          onPressed: state is ApplySubmitting
-              ? null
-              : () => _submitApplication(context),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: isSubmitting ? null : () => _openAnalysis(context),
+              icon: const Icon(Icons.analytics_outlined, size: 18),
+              label: const Text('Analyze My Application'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.deepPurple,
+                side: const BorderSide(color: Colors.deepPurple),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ),
           ),
-          // Keep the text simple since the overlay handles the loader (Requirement 1)
-          child: const Text(
-            'Submit Application',
-            style: TextStyle(fontSize: 18),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 56.0,
+            child: ElevatedButton(
+              onPressed: isSubmitting ? null : () => _submitApplication(context),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+              ),
+              child: const Text(
+                'Submit Application',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _openAnalysis(BuildContext context) {
+    // Build a map of screening responses keyed by question ID
+    final screeningMap = <String, dynamic>{};
+    if (widget.screening != null) {
+      for (int i = 0; i < widget.screening!.questions.length; i++) {
+        final question = widget.screening!.questions[i];
+        final answer = _screeningAnswers[i];
+        final value = answer['answer_text']?.toString().isNotEmpty == true
+            ? answer['answer_text']
+            : answer['answer_choice_id']?.toString();
+        if (value != null) {
+          screeningMap[question.id.toString()] = value;
+        }
+      }
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PreApplyAnalysisScreen(
+          jobSlug: widget.slug,
+          jobTitle: _jobDetails?.title ?? '',
+          coverLetter: _coverLetterController.text.isNotEmpty
+              ? _coverLetterController.text
+              : null,
+          screeningResponses: screeningMap.isNotEmpty ? screeningMap : null,
         ),
       ),
     );

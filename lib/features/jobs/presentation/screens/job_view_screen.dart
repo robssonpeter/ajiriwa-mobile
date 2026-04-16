@@ -90,28 +90,6 @@ class JobViewScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () => context.push(
-                                  AppRouter.preApplyAnalysisPath,
-                                  extra: {
-                                    'jobSlug': jobState.jobDetails.slug,
-                                    'jobTitle': jobState.jobDetails.title,
-                                  },
-                                ),
-                                icon: const Icon(Icons.analytics_outlined, size: 18),
-                                label: const Text('Analyze My Application'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.deepPurple,
-                                  side: const BorderSide(color: Colors.deepPurple),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       )
