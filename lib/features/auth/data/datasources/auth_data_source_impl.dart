@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/api_client.dart';
 import '../models/user_model.dart';
@@ -122,21 +125,107 @@ class AuthDataSourceImpl implements AuthDataSource {
   @override
   Future<UserModel> loginWithGoogle() async {
     try {
-      // TODO: Implement Google login
-      throw UnimplementedError('Google login not implemented');
+      // Sign out first to force the account picker every time
+      await GoogleSignIn.instance.signOut();
+      final account = await GoogleSignIn.instance.authenticate();
+
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        throw AuthException('Failed to obtain Google ID token');
+      }
+
+      return _socialLogin(
+        provider: 'google',
+        idToken: idToken,
+        name: account.displayName,
+        email: account.email,
+      );
+    } on AuthException {
+      rethrow;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw AuthException('Google sign-in was cancelled');
+      }
+      throw AuthException('Google sign-in failed: ${e.description}');
     } catch (e) {
-      throw AuthException('Google login failed');
+      throw AuthException('Google sign-in failed: $e');
     }
   }
 
   @override
   Future<UserModel> loginWithApple() async {
     try {
-      // TODO: Implement Apple login
-      throw UnimplementedError('Apple login not implemented');
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final identityToken = credential.identityToken;
+      if (identityToken == null) {
+        throw AuthException('Failed to obtain Apple identity token');
+      }
+
+      // Construct display name — Apple only sends it on the very first sign-in
+      final givenName = credential.givenName ?? '';
+      final familyName = credential.familyName ?? '';
+      final name = '${givenName} ${familyName}'.trim().isNotEmpty
+          ? '${givenName} ${familyName}'.trim()
+          : null;
+
+      return _socialLogin(
+        provider: 'apple',
+        idToken: identityToken,
+        name: name,
+        email: credential.email,
+      );
+    } on AuthException {
+      rethrow;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw AuthException('Apple sign-in was cancelled');
+      }
+      throw AuthException('Apple sign-in failed: ${e.message}');
     } catch (e) {
-      throw AuthException('Apple login failed');
+      throw AuthException('Apple sign-in failed: $e');
     }
+  }
+
+  /// Shared logic: send the provider ID token to the backend and
+  /// return a fully authenticated [UserModel] with a Sanctum token.
+  Future<UserModel> _socialLogin({
+    required String provider,
+    required String idToken,
+    String? name,
+    String? email,
+  }) async {
+    final response = await apiClient.post(
+      '/auth/social',
+      data: {
+        'provider': provider,
+        'id_token': idToken,
+        if (name != null) 'name': name,
+        if (email != null) 'email': email,
+      },
+      headers: {'Accept': 'application/json'},
+    );
+
+    final userData = response['user'] as Map<String, dynamic>;
+    final userMap = {
+      ...userData,
+      'token': response['token'],
+      'message': response['message'],
+    };
+
+    final user = UserModel.fromJson(userMap);
+    await apiClient.saveToken(response['token']);
+    await apiClient.secureStorage.write(
+      key: userDataKey,
+      value: json.encode(userMap),
+    );
+
+    return user;
   }
 
   @override

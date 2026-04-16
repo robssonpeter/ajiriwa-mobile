@@ -342,20 +342,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OutlinedButton.icon(
-          icon: const Icon(Icons.g_mobiledata, size: 24),
+          icon: Image.asset('assets/images/google_logo.png', height: 20, width: 20,
+              errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata, size: 22)),
           label: const Text('Continue with Google'),
-          onPressed: () {
-            // TODO: Implement Google registration
-          },
+          onPressed: () => context.read<AuthBloc>().add(LoginWithGoogleEvent()),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: BorderSide(color: Colors.grey.shade300),
+          ),
         ),
         if (Platform.isIOS) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
-            icon: const Icon(Icons.apple, size: 24),
+            icon: const Icon(Icons.apple, size: 22),
             label: const Text('Continue with Apple'),
-            onPressed: () {
-              // TODO: Implement Apple registration
-            },
+            onPressed: () => context.read<AuthBloc>().add(LoginWithAppleEvent()),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: BorderSide(color: Colors.grey.shade300),
+            ),
           ),
         ],
       ],
