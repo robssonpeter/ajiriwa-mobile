@@ -75,4 +75,22 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
       return const Left(NetworkFailure('No internet connection'));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> generateInterviewPrep(
+    int scheduleId, {
+    bool refresh = false,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+    try {
+      final data = await remoteDataSource.generateInterviewPrep(scheduleId, refresh: refresh);
+      return Right(data);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return const Left(ServerFailure('An unexpected error occurred'));
+    }
+  }
 }

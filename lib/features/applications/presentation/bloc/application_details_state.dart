@@ -50,3 +50,29 @@ class ApplicationWithdrawing extends ApplicationDetailsState {
 class ApplicationWithdrawn extends ApplicationDetailsState {
   const ApplicationWithdrawn();
 }
+
+/// Interview prep is being generated
+class InterviewPrepLoading extends ApplicationDetailsState {
+  final ApplicationDetails applicationDetails;
+  const InterviewPrepLoading(this.applicationDetails);
+  @override
+  List<Object?> get props => [applicationDetails];
+}
+
+/// Interview prep loaded successfully
+class InterviewPrepLoaded extends ApplicationDetailsState {
+  final ApplicationDetails applicationDetails;
+  final Map<String, dynamic> prepData;
+  const InterviewPrepLoaded({required this.applicationDetails, required this.prepData});
+  @override
+  List<Object?> get props => [applicationDetails, prepData];
+}
+
+/// Interview prep error
+class InterviewPrepError extends ApplicationDetailsState {
+  final ApplicationDetails applicationDetails;
+  final String message;
+  const InterviewPrepError({required this.applicationDetails, required this.message});
+  @override
+  List<Object?> get props => [applicationDetails, message];
+}

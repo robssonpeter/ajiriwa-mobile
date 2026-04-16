@@ -40,6 +40,12 @@ import '../../features/cv_optimization/data/datasources/cv_optimization_data_sou
 import '../../features/cv_optimization/data/repositories/cv_optimization_repository_impl.dart';
 import '../../features/cv_optimization/domain/repositories/cv_optimization_repository.dart';
 import '../../features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
+import '../../features/job_alerts/data/datasources/job_alert_data_source.dart';
+import '../../features/job_alerts/data/datasources/job_alert_data_source_impl.dart';
+import '../../features/job_alerts/data/repositories/job_alert_repository_impl.dart';
+import '../../features/job_alerts/domain/repositories/job_alert_repository.dart';
+import '../../features/job_alerts/presentation/bloc/job_alerts_bloc.dart';
+import '../../features/jobs/presentation/bloc/pre_apply_bloc.dart';
 import '../network/api_client.dart';
 import '../network/network_info.dart';
 import '../network/network_info_impl.dart';
@@ -181,6 +187,22 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<CvOptimizationDataSource>(
     () => CvOptimizationDataSourceImpl(apiClient: sl()),
+  );
+
+  // Features - Job Alerts
+  sl.registerFactory(
+    () => JobAlertsBloc(repository: sl()),
+  );
+  sl.registerLazySingleton<JobAlertRepository>(
+    () => JobAlertRepositoryImpl(dataSource: sl(), networkInfo: sl()),
+  );
+  sl.registerLazySingleton<JobAlertDataSource>(
+    () => JobAlertDataSourceImpl(apiClient: sl()),
+  );
+
+  // Features - Pre-Apply Analysis (uses JobRepository which is already registered)
+  sl.registerFactory(
+    () => PreApplyBloc(jobRepository: sl()),
   );
 
   // Core

@@ -14,4 +14,7 @@ abstract class ApplicationDataSource {
 
   /// Withdraw an application by ID
   Future<void> withdrawApplication(int applicationId);
+
+  /// Generate AI interview prep tips for an interview schedule
+  Future<Map<String, dynamic>> generateInterviewPrep(int scheduleId, {bool refresh = false});
 }

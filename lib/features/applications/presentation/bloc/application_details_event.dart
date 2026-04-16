@@ -32,3 +32,12 @@ class WithdrawApplicationEvent extends ApplicationDetailsEvent {
   @override
   List<Object?> get props => [applicationId];
 }
+
+/// Event to generate interview prep tips
+class GenerateInterviewPrepEvent extends ApplicationDetailsEvent {
+  final int scheduleId;
+  final bool refresh;
+  const GenerateInterviewPrepEvent(this.scheduleId, {this.refresh = false});
+  @override
+  List<Object?> get props => [scheduleId, refresh];
+}

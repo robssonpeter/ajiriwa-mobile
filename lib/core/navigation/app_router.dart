@@ -30,6 +30,8 @@ import '../../features/profile/presentation/screens/change_password_screen.dart'
 import '../../features/cv_optimization/presentation/screens/cv_optimization_screen.dart';
 import '../../features/cv_optimization/presentation/screens/subscription_screen.dart';
 import '../../features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
+import '../../features/job_alerts/presentation/screens/job_alerts_screen.dart';
+import '../../features/jobs/presentation/screens/pre_apply_analysis_screen.dart';
 import '../di/injection_container.dart' as di;
 import '../widgets/main_screen.dart';
 
@@ -67,6 +69,8 @@ class AppRouter {
   static const String changePassword = 'change-password';
   static const String cvOptimization = 'cv-optimization';
   static const String subscription = 'subscription';
+  static const String jobAlerts = 'job-alerts';
+  static const String preApplyAnalysis = 'pre-apply-analysis';
 
   // Route paths
   static const String dashboardPath = '/dashboard';
@@ -97,6 +101,8 @@ class AppRouter {
   static const String changePasswordPath = '/settings/change-password';
   static const String cvOptimizationPath = '/cv-optimization';
   static const String subscriptionPath = '/subscription';
+  static const String jobAlertsPath = '/job-alerts';
+  static const String preApplyAnalysisPath = '/pre-apply-analysis';
 
   // Tab indices for bottom navigation
   static const int dashboardTabIndex = 0;
@@ -356,6 +362,28 @@ class AppRouter {
               return BlocProvider.value(
                 value: di.sl<CvOptimizationBloc>(),
                 child: const SubscriptionScreen(),
+              );
+            },
+          ),
+          // Job Alerts route
+          GoRoute(
+            path: jobAlertsPath,
+            name: jobAlerts,
+            builder: (context, state) => const JobAlertsScreen(),
+          ),
+          // Pre-Apply Analysis route
+          GoRoute(
+            path: preApplyAnalysisPath,
+            name: preApplyAnalysis,
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return PreApplyAnalysisScreen(
+                jobSlug: extra?['jobSlug'] as String? ?? '',
+                jobTitle: extra?['jobTitle'] as String? ?? '',
+                coverLetter: extra?['coverLetter'] as String?,
+                screeningResponses:
+                    extra?['screeningResponses'] as Map<String, dynamic>?,
+                cvOptimizationId: extra?['cvOptimizationId'] as int?,
               );
             },
           ),

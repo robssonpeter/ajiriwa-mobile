@@ -17,4 +17,7 @@ abstract class ApplicationRepository {
 
   /// Withdraw an application by ID
   Future<Either<Failure, void>> withdrawApplication(int applicationId);
+
+  /// Generate AI interview prep tips
+  Future<Either<Failure, Map<String, dynamic>>> generateInterviewPrep(int scheduleId, {bool refresh = false});
 }

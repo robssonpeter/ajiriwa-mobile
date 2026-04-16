@@ -7,6 +7,7 @@ import '../entities/job_details.dart';
 import '../entities/job_eligibility.dart';
 import '../entities/job_screening.dart';
 import '../entities/jobs_response.dart';
+import '../entities/pre_apply_analysis.dart';
 
 /// Repository interface for job data
 abstract class JobRepository {
@@ -81,4 +82,15 @@ abstract class JobRepository {
     String? refineInstructions,
     int? candidateId,
   });
+
+  /// Run pre-application analysis
+  Future<Either<Failure, PreApplyAnalysis>> analyzeApplication({
+    required String jobSlug,
+    String? coverLetter,
+    Map<String, dynamic>? screeningResponses,
+    int? cvOptimizationId,
+  });
+
+  /// Get existing pre-application analysis for a job
+  Future<Either<Failure, PreApplyAnalysis?>> getAnalysis(String jobSlug);
 }

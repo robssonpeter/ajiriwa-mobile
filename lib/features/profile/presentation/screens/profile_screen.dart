@@ -296,6 +296,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.goNamed(AppRouter.notificationSettings),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.notifications_active),
+            title: const Text('Job Alerts'),
+            subtitle: const Text('Get notified about matching jobs'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.pushNamed(AppRouter.jobAlerts),
+          ),
         ],
       ),
     );

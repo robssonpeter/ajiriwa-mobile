@@ -5,6 +5,7 @@ import '../models/job_details_model.dart';
 import '../models/job_eligibility_model.dart';
 import '../models/job_screening_model.dart';
 import '../models/jobs_response_model.dart';
+import '../models/pre_apply_analysis_model.dart';
 
 /// Data source interface for job data
 abstract class JobDataSource {
@@ -67,4 +68,15 @@ abstract class JobDataSource {
     String? refineInstructions,
     int? candidateId,
   });
+
+  /// Run pre-application analysis for a draft application
+  Future<PreApplyAnalysisModel> analyzeApplication({
+    required String jobSlug,
+    String? coverLetter,
+    Map<String, dynamic>? screeningResponses,
+    int? cvOptimizationId,
+  });
+
+  /// Get existing pre-application analysis for a job
+  Future<PreApplyAnalysisModel?> getAnalysis(String jobSlug);
 }

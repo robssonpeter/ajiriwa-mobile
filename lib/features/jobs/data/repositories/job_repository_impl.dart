@@ -9,6 +9,7 @@ import '../../domain/entities/job_details.dart';
 import '../../domain/entities/job_eligibility.dart';
 import '../../domain/entities/job_screening.dart';
 import '../../domain/entities/jobs_response.dart';
+import '../../domain/entities/pre_apply_analysis.dart';
 import '../../domain/repositories/job_repository.dart';
 import '../datasources/job_data_source.dart';
 import '../models/job_apply_request_model.dart';
@@ -341,6 +342,46 @@ class JobRepositoryImpl implements JobRepository {
       }
     } else {
       return const Left(NetworkFailure('No internet connection'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PreApplyAnalysis>> analyzeApplication({
+    required String jobSlug,
+    String? coverLetter,
+    Map<String, dynamic>? screeningResponses,
+    int? cvOptimizationId,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+    try {
+      final model = await remoteDataSource.analyzeApplication(
+        jobSlug: jobSlug,
+        coverLetter: coverLetter,
+        screeningResponses: screeningResponses,
+        cvOptimizationId: cvOptimizationId,
+      );
+      return Right(model.toEntity());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure('Analysis failed: ${e.toString()}'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PreApplyAnalysis?>> getAnalysis(String jobSlug) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('No internet connection'));
+    }
+    try {
+      final model = await remoteDataSource.getAnalysis(jobSlug);
+      return Right(model?.toEntity());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return const Left(ServerFailure('Failed to load analysis'));
     }
   }
 

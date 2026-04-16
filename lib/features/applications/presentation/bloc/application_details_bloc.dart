@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/application_details.dart';
 import '../../domain/repositories/application_repository.dart';
 import 'application_details_event.dart';
 import 'application_details_state.dart';
@@ -15,6 +16,7 @@ class ApplicationDetailsBloc extends Bloc<ApplicationDetailsEvent, ApplicationDe
   }) : super(ApplicationDetailsInitial()) {
     on<LoadApplicationDetailsEvent>(_onLoadApplicationDetails);
     on<WithdrawApplicationEvent>(_onWithdrawApplication);
+    on<GenerateInterviewPrepEvent>(_onGenerateInterviewPrep);
   }
 
   /// Handle load application details event
@@ -44,6 +46,31 @@ class ApplicationDetailsBloc extends Bloc<ApplicationDetailsEvent, ApplicationDe
     result.fold(
       (failure) => emit(ApplicationDetailsError(failure.message)),
       (_) => emit(const ApplicationWithdrawn()),
+    );
+  }
+
+  /// Handle generate interview prep event
+  Future<void> _onGenerateInterviewPrep(
+    GenerateInterviewPrepEvent event,
+    Emitter<ApplicationDetailsState> emit,
+  ) async {
+    final current = state;
+    ApplicationDetails? details;
+    if (current is ApplicationDetailsLoaded) details = current.applicationDetails;
+    if (current is InterviewPrepLoaded) details = current.applicationDetails;
+    if (current is InterviewPrepError) details = current.applicationDetails;
+    if (details == null) return;
+
+    emit(InterviewPrepLoading(details));
+
+    final result = await applicationRepository.generateInterviewPrep(
+      event.scheduleId,
+      refresh: event.refresh,
+    );
+
+    result.fold(
+      (failure) => emit(InterviewPrepError(applicationDetails: details!, message: failure.message)),
+      (prepData) => emit(InterviewPrepLoaded(applicationDetails: details!, prepData: prepData)),
     );
   }
 }

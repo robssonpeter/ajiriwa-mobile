@@ -84,4 +84,20 @@ class ApplicationDataSourceImpl implements ApplicationDataSource {
       }
     }
   }
+
+  @override
+  Future<Map<String, dynamic>> generateInterviewPrep(int scheduleId, {bool refresh = false}) async {
+    try {
+      final response = await apiClient.post(
+        '/interviews/$scheduleId/prep',
+        data: refresh ? {'refresh': true} : {},
+      );
+      if (response == null) throw ServerException('Empty response');
+      return response as Map<String, dynamic>;
+    } catch (e, stackTrace) {
+      appLogger.e('Interview Prep Error', error: e, stackTrace: stackTrace);
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to generate interview prep: ${e.runtimeType}');
+    }
+  }
 }

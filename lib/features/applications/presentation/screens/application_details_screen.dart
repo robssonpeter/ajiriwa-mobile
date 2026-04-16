@@ -108,6 +108,12 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
       );
     } else if (state is ApplicationDetailsLoaded) {
       return _buildBody(context, state.applicationDetails);
+    } else if (state is InterviewPrepLoading) {
+      return _buildBody(context, state.applicationDetails);
+    } else if (state is InterviewPrepLoaded) {
+      return _buildBody(context, state.applicationDetails);
+    } else if (state is InterviewPrepError) {
+      return _buildBody(context, state.applicationDetails);
     }
 
     // Fallback
@@ -341,6 +347,11 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
             ),
           const SizedBox(height: 16),
 
+          // Interview schedule card
+          if (applicationDetails.schedule != null)
+            _buildInterviewCard(context, applicationDetails.schedule, state),
+          const SizedBox(height: 16),
+
           // No employer notes in the API response
           const SizedBox(height: 24),
 
@@ -385,6 +396,183 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildInterviewCard(
+    BuildContext context,
+    dynamic schedule,
+    ApplicationDetailsState state,
+  ) {
+    final Map<String, dynamic> s =
+        schedule is Map<String, dynamic> ? schedule : {};
+    final typeLabels = {1: 'Face to Face', 2: 'Telephone', 3: 'Virtual'};
+    final interviewType = typeLabels[s['interview_type']] ?? 'Interview';
+    final date = s['date'] ?? '';
+    final time = s['time'] ?? '';
+    final venue = s['venue'];
+    final meetingLink = s['meeting_link'];
+    final scheduleId = s['id'] as int?;
+
+    final isPrepLoading = state is InterviewPrepLoading;
+    final prepData = state is InterviewPrepLoaded ? state.prepData : null;
+    final prepError = state is InterviewPrepError ? state.message : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.event, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text(
+                  'Interview Scheduled',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(Icons.category, interviewType),
+            if (date.isNotEmpty) _buildInfoRow(Icons.calendar_today, '$date at $time'),
+            if (venue != null && venue.toString().isNotEmpty)
+              _buildInfoRow(Icons.location_on, venue.toString()),
+            if (meetingLink != null && meetingLink.toString().isNotEmpty)
+              _buildInfoRow(Icons.videocam, 'Virtual meeting link available'),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'AI Interview Preparation',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            if (prepData != null) ...[
+              _buildPrepSection('Preparation Tips', Icons.lightbulb_outline,
+                  _toStringList(prepData['tips']), Colors.blue),
+              const SizedBox(height: 12),
+              _buildPrepSection('Likely Questions', Icons.help_outline,
+                  _toStringList(prepData['likely_questions']), Colors.orange),
+              const SizedBox(height: 12),
+              _buildPrepSection('Questions to Ask', Icons.question_answer_outlined,
+                  _toStringList(prepData['questions_to_ask']), Colors.green),
+              const SizedBox(height: 12),
+              if (scheduleId != null)
+                TextButton.icon(
+                  onPressed: isPrepLoading
+                      ? null
+                      : () => context.read<ApplicationDetailsBloc>().add(
+                            GenerateInterviewPrepEvent(scheduleId, refresh: true),
+                          ),
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Refresh Tips'),
+                ),
+            ] else if (prepError != null) ...[
+              Text('Error: $prepError',
+                  style: TextStyle(color: Colors.red.shade600)),
+              const SizedBox(height: 8),
+              if (scheduleId != null)
+                ElevatedButton.icon(
+                  onPressed: () => context.read<ApplicationDetailsBloc>().add(
+                        GenerateInterviewPrepEvent(scheduleId),
+                      ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+            ] else if (isPrepLoading) ...[
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 8),
+                      Text('Generating personalised tips...'),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              Text(
+                'Get AI-powered tips, likely interview questions, and smart questions to ask the interviewer.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              if (scheduleId != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.read<ApplicationDetailsBloc>().add(
+                          GenerateInterviewPrepEvent(scheduleId),
+                        ),
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Generate Prep Tips'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrepSection(
+      String title, IconData icon, List<String> items, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: color, fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ...items.asMap().entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${e.key + 1}. ',
+                        style: TextStyle(
+                            color: color, fontWeight: FontWeight.bold)),
+                    Expanded(
+                        child: Text(e.value,
+                            style: const TextStyle(fontSize: 13))),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  List<String> _toStringList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) return value.map((e) => e.toString()).toList();
+    return [];
   }
 
   List<Widget> _buildDocumentsList(List<ApplicationAttachment> attachments) {
