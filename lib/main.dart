@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'dart:async';
 import 'dart:io';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -95,6 +97,13 @@ class AjiriwaApp extends StatelessWidget {
         themeMode: ThemeMode.light, // Default to light theme
         debugShowCheckedModeBanner: false,
         routerConfig: AppRouter.router,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          FlutterQuillLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en')],
       ),
     );
   }

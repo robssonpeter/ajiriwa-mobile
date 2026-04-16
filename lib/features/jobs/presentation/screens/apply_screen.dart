@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:convert/convert.dart'; // Ensure this is needed/used, otherwise consider removing
 
-// Assuming these imports are correctly defined in your project
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/widgets/cover_letter_editor.dart';
 import '../../domain/entities/job_apply_context.dart';
 import '../../domain/entities/job_details.dart';
 import '../../domain/entities/job_screening.dart';
@@ -39,7 +38,7 @@ class ApplyScreen extends StatefulWidget {
 }
 
 class _ApplyScreenState extends State<ApplyScreen> {
-  final TextEditingController _coverLetterController = TextEditingController();
+  final GlobalKey<CoverLetterEditorState> _editorKey = GlobalKey<CoverLetterEditorState>();
   final List<Map<String, dynamic>> _selectedCertificates = [];
   final List<Map<String, dynamic>> _screeningAnswers = [];
 
@@ -91,7 +90,6 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
   @override
   void dispose() {
-    _coverLetterController.dispose();
     super.dispose();
   }
 
@@ -126,9 +124,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
             }).toList();
           });
         } else if (state is CoverLetterGenerationSuccess) {
-          setState(() {
-            _coverLetterController.text = state.content;
-          });
+          _editorKey.currentState?.setHtml(state.content);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Cover letter generated successfully!'),
@@ -174,7 +170,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
       }
 
       if (state.details!.containsKey('coverLetter') && state.details!['coverLetter'] != null) {
-        _coverLetterController.text = state.details!['coverLetter'] as String;
+        _editorKey.currentState?.setHtml(state.details!['coverLetter'] as String);
       }
 
       if (state.details!.containsKey('attachments') && state.details!['attachments'] != null) {
@@ -292,7 +288,11 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 TextButton.icon(
                   onPressed: () => _generateAiCoverLetter(context),
                   icon: const Icon(Icons.auto_awesome, size: 18),
-                  label: Text(_coverLetterController.text.isEmpty ? 'Write for me' : 'Refine with AI'),
+                  label: Text(
+                    (_editorKey.currentState?.getPlainText() ?? '').isEmpty
+                        ? 'Write for me'
+                        : 'Refine with AI',
+                  ),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -301,14 +301,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          TextField(
-            controller: _coverLetterController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'Enter your cover letter here...',
-              border: OutlineInputBorder(),
-            ),
-          ),
+          CoverLetterEditor(key: _editorKey),
           const SizedBox(height: 16),
 
           // Certificates
@@ -904,8 +897,8 @@ class _ApplyScreenState extends State<ApplyScreen> {
         builder: (_) => PreApplyAnalysisScreen(
           jobSlug: widget.slug,
           jobTitle: _jobDetails?.title ?? '',
-          coverLetter: _coverLetterController.text.isNotEmpty
-              ? _coverLetterController.text
+          coverLetter: (_editorKey.currentState?.getPlainText() ?? '').isNotEmpty
+              ? _editorKey.currentState?.getHtml()
               : null,
           screeningResponses: screeningMap.isNotEmpty ? screeningMap : null,
         ),
@@ -992,14 +985,14 @@ class _ApplyScreenState extends State<ApplyScreen> {
           jobId: _jobDetails?.id ?? 0,
           screeningAnswers: _screeningAnswers,
           resumeId: resumeId,
-          coverLetter: _coverLetterController.text,
+          coverLetter: _editorKey.currentState?.getHtml() ?? '',
           attachments: attachments,
           candidateId: widget.candidateId,
         ),
       );
     } else if (widget.applicationMethod == 'email') {
       final certificateNames = _selectedCertificates.map((c) => c['name']).join(', ');
-      final notes = 'Cover Letter: ${_coverLetterController.text}\n\nAttached Certificates: $certificateNames';
+      final notes = 'Cover Letter: ${_editorKey.currentState?.getPlainText() ?? ''}\n\nAttached Certificates: $certificateNames';
 
       context.read<ApplyBloc>().add(
         ApplyExternalIntentRecorded(
@@ -1024,7 +1017,8 @@ class _ApplyScreenState extends State<ApplyScreen> {
   void _generateAiCoverLetter(BuildContext context) {
     if (_jobDetails == null) return;
 
-    final startingPoint = _coverLetterController.text.isNotEmpty ? _coverLetterController.text : null;
+    final currentHtml = _editorKey.currentState?.getHtml() ?? '';
+    final startingPoint = (_editorKey.currentState?.getPlainText() ?? '').isNotEmpty ? currentHtml : null;
 
     if (startingPoint != null) {
       // Show refinement dialog

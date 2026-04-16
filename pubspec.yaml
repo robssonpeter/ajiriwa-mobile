@@ -88,6 +88,9 @@ dependencies:
   # Social auth
   # google_sign_in: 6.1.6  # Temporarily removed due to dependency conflicts
   sign_in_with_apple: ^7.0.1
+  flutter_quill: ^11.5.0
+  flutter_quill_delta_from_html: ^1.5.3
+  vsc_quill_delta_to_html: ^1.0.5
 
 dev_dependencies:
   flutter_test:
