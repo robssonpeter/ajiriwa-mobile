@@ -32,6 +32,10 @@ import '../../features/cv_optimization/presentation/screens/subscription_screen.
 import '../../features/cv_optimization/presentation/bloc/cv_optimization_bloc.dart';
 import '../../features/job_alerts/presentation/screens/job_alerts_screen.dart';
 import '../../features/jobs/presentation/screens/pre_apply_analysis_screen.dart';
+import '../../features/onboarding/presentation/bloc/onboarding_bloc.dart';
+import '../../features/onboarding/presentation/screens/cv_choice_screen.dart';
+import '../../features/onboarding/presentation/screens/cv_success_screen.dart';
+import '../../features/onboarding/presentation/screens/cv_upload_screen.dart';
 import '../di/injection_container.dart' as di;
 import '../widgets/main_screen.dart';
 
@@ -71,6 +75,9 @@ class AppRouter {
   static const String subscription = 'subscription';
   static const String jobAlerts = 'job-alerts';
   static const String preApplyAnalysis = 'pre-apply-analysis';
+  static const String onboardingChoice = 'onboarding-choice';
+  static const String onboardingUpload = 'onboarding-upload';
+  static const String onboardingSuccess = 'onboarding-success';
 
   // Route paths
   static const String dashboardPath = '/dashboard';
@@ -103,6 +110,9 @@ class AppRouter {
   static const String subscriptionPath = '/subscription';
   static const String jobAlertsPath = '/job-alerts';
   static const String preApplyAnalysisPath = '/pre-apply-analysis';
+  static const String onboardingChoicePath = '/onboarding/cv-choice';
+  static const String onboardingUploadPath = '/onboarding/cv-upload';
+  static const String onboardingSuccessPath = '/onboarding/cv-success';
 
   // Tab indices for bottom navigation
   static const int dashboardTabIndex = 0;
@@ -371,6 +381,39 @@ class AppRouter {
             name: jobAlerts,
             builder: (context, state) => const JobAlertsScreen(),
           ),
+
+          // Onboarding routes
+          GoRoute(
+            path: onboardingChoicePath,
+            name: onboardingChoice,
+            builder: (context, state) => const CvChoiceScreen(),
+          ),
+          GoRoute(
+            path: onboardingUploadPath,
+            name: onboardingUpload,
+            builder: (context, state) {
+              final authState = context.read<AuthBloc>().state;
+              final candidateId = authState is Authenticated
+                  ? (authState.user.candidateDetails?['id'] as int? ??
+                      authState.user.selectedCandidateId ??
+                      0)
+                  : 0;
+              return BlocProvider(
+                create: (_) => di.sl<OnboardingBloc>(),
+                child: CvUploadScreen(candidateId: candidateId),
+              );
+            },
+          ),
+          GoRoute(
+            path: onboardingSuccessPath,
+            name: onboardingSuccess,
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return CvSuccessScreen(
+                profileCompletion: extra?['profileCompletion'] as int? ?? 0,
+              );
+            },
+          ),
           // Pre-Apply Analysis route
           GoRoute(
             path: preApplyAnalysisPath,
@@ -389,29 +432,37 @@ class AppRouter {
           ),
         ],
         redirect: (context, state) {
-          // Get the authentication state from the AuthBloc
           final authState = context.read<AuthBloc>().state;
 
-          // If the user is not authenticated and trying to access a protected route,
-          // redirect to the login screen
           final isGoingToLogin = state.matchedLocation == loginPath;
           final isGoingToRegister = state.matchedLocation == registerPath;
           final isGoingToForgotPassword = state.matchedLocation == forgotPasswordPath;
+          final isOnboarding = state.matchedLocation.startsWith('/onboarding');
           final isAuthenticated = authState is Authenticated;
 
-          // If the user is not authenticated and not going to login, register, or forgot password,
-          // redirect to login
+          // Unauthenticated → login
           if (!isAuthenticated && !isGoingToLogin && !isGoingToRegister && !isGoingToForgotPassword) {
             return loginPath;
           }
 
-          // If the user is authenticated and trying to access login or register,
-          // redirect to dashboard
-          if (isAuthenticated && (isGoingToLogin || isGoingToRegister)) {
-            return dashboardPath;
+          // Authenticated on auth screens → redirect away
+          if (authState is Authenticated && (isGoingToLogin || isGoingToRegister)) {
+            final completion = authState.user.candidateDetails?['profile_completion'] as int? ?? 0;
+            return completion <= 10 ? onboardingChoicePath : dashboardPath;
           }
 
-          // No redirect needed
+          // Authenticated, heading to main app — check if onboarding is needed
+          if (authState is Authenticated && !isOnboarding) {
+            final completion = authState.user.candidateDetails?['profile_completion'] as int? ?? 0;
+            // Profile completion of 10 is the default set on register — user hasn't set up yet
+            if (completion <= 10 &&
+                !isGoingToLogin &&
+                !isGoingToRegister &&
+                !isGoingToForgotPassword) {
+              return onboardingChoicePath;
+            }
+          }
+
           return null;
         },
       );

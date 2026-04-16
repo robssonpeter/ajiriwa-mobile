@@ -46,6 +46,11 @@ import '../../features/job_alerts/data/repositories/job_alert_repository_impl.da
 import '../../features/job_alerts/domain/repositories/job_alert_repository.dart';
 import '../../features/job_alerts/presentation/bloc/job_alerts_bloc.dart';
 import '../../features/jobs/presentation/bloc/pre_apply_bloc.dart';
+import '../../features/onboarding/data/datasources/onboarding_data_source.dart';
+import '../../features/onboarding/data/datasources/onboarding_data_source_impl.dart';
+import '../../features/onboarding/data/repositories/onboarding_repository_impl.dart';
+import '../../features/onboarding/domain/repositories/onboarding_repository.dart';
+import '../../features/onboarding/presentation/bloc/onboarding_bloc.dart';
 import '../network/api_client.dart';
 import '../network/network_info.dart';
 import '../network/network_info_impl.dart';
@@ -203,6 +208,15 @@ Future<void> init() async {
   // Features - Pre-Apply Analysis (uses JobRepository which is already registered)
   sl.registerFactory(
     () => PreApplyBloc(jobRepository: sl()),
+  );
+
+  // Onboarding
+  sl.registerFactory(() => OnboardingBloc(repository: sl()));
+  sl.registerLazySingleton<OnboardingRepository>(
+    () => OnboardingRepositoryImpl(dataSource: sl()),
+  );
+  sl.registerLazySingleton<OnboardingDataSource>(
+    () => OnboardingDataSourceImpl(apiClient: sl()),
   );
 
   // Core
