@@ -26,6 +26,7 @@ class CoverLetterEditor extends StatefulWidget {
 class CoverLetterEditorState extends State<CoverLetterEditor> {
   late QuillController _controller;
   final FocusNode _focusNode = FocusNode();
+  bool _isAnimating = false;
 
   @override
   void initState() {
@@ -72,6 +73,7 @@ class CoverLetterEditorState extends State<CoverLetterEditor> {
 
   /// Replaces the editor content with the given HTML string.
   void setHtml(String html) {
+    _isAnimating = false;
     try {
       final delta = HtmlToDelta().convert(html);
       _controller.document = Document.fromDelta(delta);
@@ -84,6 +86,56 @@ class CoverLetterEditorState extends State<CoverLetterEditor> {
         const TextSelection.collapsed(offset: 0),
         ChangeSource.remote,
       );
+    }
+  }
+
+  /// Animates the content as if being typed, then swaps to the full rich HTML.
+  /// Mirrors the typing effect seen in the web TipTap editor.
+  Future<void> animateSetHtml(String html) async {
+    // Cancel any in-progress animation
+    _isAnimating = false;
+    // Yield so any running loop can observe the flag change
+    await Future.delayed(const Duration(milliseconds: 20));
+    if (!mounted) return;
+
+    _isAnimating = true;
+    final plainText = _htmlToPlainText(html);
+
+    _controller.clear();
+
+    for (int i = 0; i < plainText.length; i++) {
+      if (!_isAnimating || !mounted) return;
+      _controller.replaceText(
+        i, 0, plainText[i],
+        TextSelection.collapsed(offset: i + 1),
+      );
+      await Future.delayed(const Duration(milliseconds: 8));
+    }
+
+    if (!_isAnimating || !mounted) return;
+
+    // Animation done — swap plain text for the fully-formatted HTML
+    _isAnimating = false;
+    setHtml(html);
+  }
+
+  /// Strips HTML tags to get the plain text for the typing animation.
+  String _htmlToPlainText(String html) {
+    try {
+      final delta = HtmlToDelta().convert(html);
+      return Document.fromDelta(delta).toPlainText().trim();
+    } catch (_) {
+      return html
+          .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+          .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
+          .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n')
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .replaceAll('&nbsp;', ' ')
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .trim();
     }
   }
 

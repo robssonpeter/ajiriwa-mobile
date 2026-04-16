@@ -124,7 +124,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
             }).toList();
           });
         } else if (state is CoverLetterGenerationSuccess) {
-          _editorKey.currentState?.setHtml(state.content);
+          _editorKey.currentState?.animateSetHtml(state.content);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Cover letter generated successfully!'),
