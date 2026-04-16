@@ -113,6 +113,11 @@ dev_dependencies:
   mockito: ^5.4.4
   golden_toolkit: ^0.15.0
 
+# Pin win32 to 5.0.4 to avoid quill_native_bridge_windows 0.0.2 breakage
+# (win32 >=5.5.0 moved GMEM_MOVEABLE into GLOBAL_ALLOC_FLAGS, breaking the plugin)
+dependency_overrides:
+  win32: 5.0.4
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
